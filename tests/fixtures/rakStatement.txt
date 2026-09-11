@@ -1,0 +1,16 @@
+10 Mar 2026
+CHARGE COLLECTION MAR26 INCL VAT
+AED 103.95 DR
+
+25 Mar 2026
+RAKvalue Monthly Fee Mar 2026
+AED 51.45 DR
+
+15 Mar 2026
+OUTWARD T/T TO
+Federal tax authority VAT PAYMENT
+AED 500.00 DR
+
+28 Mar 2026
+Incoming wire transfer from client
+AED 2000.00 CR

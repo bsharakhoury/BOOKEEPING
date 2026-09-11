@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+# Real personal/business financial data — never commit this. Anchored to the project root
+# (leading /) so it doesn't catch the CSV fixtures the test suite needs under tests/fixtures/.
+/old-my-financials.json
+/my-financials-export-*.json
+/*.csv

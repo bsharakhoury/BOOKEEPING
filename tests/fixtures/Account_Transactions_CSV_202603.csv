@@ -1,0 +1,14 @@
+RAK Bank
+Account_Transactions_CSV Export
+
+Account Number:,1234567890,,,,,,,,,,
+Statement Period:,01/03/2026,to,31/03/2026,,,,,,,,
+
+,Post Date,,Value Date,Reference,,Description,Card/Ref,Memo,Debit,Credit,Balance
+,10/03/2026,,10/03/2026,REF003,,"CHARGE COLLECTION MAR26 INCL VAT",S00000001,,103.95,,9793.15
+,25/03/2026,,25/03/2026,REF002,,"RAKvalue Monthly Fee Mar 2026",S74640518,,51.45,,9897.10
+,15/03/2026,,15/03/2026,REF004,,"OUTWARD T/T TO Federal tax authority VAT PAYMENT",S00000002,,500.00,,9293.15
+,20/03/2026,,20/03/2026,REF005,,"PURCHASE TRXN.-REV AMAZON REFUND",S00000003,,,120.00,9413.15
+,22/03/2026,,22/03/2026,REF006,,"Supplier payment Mar 2026
+XYZ Productions",S00000005,,1000.00,,8413.15
+,28/03/2026,,28/03/2026,REF007,,"Incoming wire transfer from client",S00000006,,,2000.00,10413.15

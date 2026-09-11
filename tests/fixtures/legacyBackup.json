@@ -1,0 +1,153 @@
+{
+  "txns": [
+    {
+      "id": "t1",
+      "date": "2026-01-05",
+      "merchant": "Carrefour",
+      "category": "Food (Groceries)",
+      "amount": 120,
+      "type": "expense",
+      "ledger": "personal",
+      "paymentMethod": "Mashreq Debit 9437",
+      "notes": "",
+      "source": "historical",
+      "createdAt": "2026-01-05T10:00:00Z"
+    },
+    {
+      "id": "t2",
+      "date": "2026-01-06",
+      "merchant": "Beno Payroll",
+      "category": "Salary – Beno",
+      "amount": 5000,
+      "type": "income",
+      "ledger": "income",
+      "paymentMethod": "Mashreq Debit 9437",
+      "notes": "",
+      "source": "historical",
+      "createdAt": "2026-01-06T10:00:00Z"
+    },
+    {
+      "id": "t3",
+      "date": "2026-01-07",
+      "merchant": "Own transfer",
+      "category": "Transfer",
+      "amount": 200,
+      "type": "expense",
+      "ledger": "personal",
+      "paymentMethod": "Mashreq Transfer",
+      "notes": "",
+      "source": "historical",
+      "createdAt": "2026-01-07T10:00:00Z"
+    },
+    {
+      "id": "t4",
+      "date": "2026-01-08",
+      "merchant": "RAK bank fee",
+      "category": "LH - Bank Fees",
+      "amount": 51.45,
+      "type": "expense",
+      "ledger": "lh_business",
+      "paymentMethod": "RAK Bank",
+      "notes": "",
+      "inputVat": 2.45,
+      "vatReclaimable": true,
+      "source": "historical",
+      "createdAt": "2026-01-08T10:00:00Z"
+    },
+    {
+      "id": "t5",
+      "date": "2026-01-09",
+      "merchant": "Random shop",
+      "category": "Some New Category",
+      "amount": 40,
+      "type": "expense",
+      "ledger": "personal",
+      "paymentMethod": "Unknown Wallet",
+      "notes": "",
+      "source": "historical",
+      "createdAt": "2026-01-09T10:00:00Z"
+    },
+    {
+      "id": "t6",
+      "date": "2026-01-10",
+      "merchant": "Debt payment – ENBD (settlement)",
+      "category": "Debt payment",
+      "amount": 1000,
+      "type": "expense",
+      "ledger": "personal",
+      "paymentMethod": "Mashreq Transfer",
+      "notes": "",
+      "debtId": "d1",
+      "source": "debt_payment",
+      "createdAt": "2026-01-10T10:00:00Z"
+    }
+  ],
+  "subs": [
+    {
+      "id": "s1",
+      "name": "Spotify",
+      "category": "Personal subscription",
+      "ledger": "personal",
+      "amount": 23.99,
+      "frequency": "monthly",
+      "dayOfMonth": 17,
+      "nextDue": "2026-07-17",
+      "bank": "Mashreq Debit 9437",
+      "active": true,
+      "notes": ""
+    }
+  ],
+  "debt": [
+    {
+      "id": "d1",
+      "name": "ENBD",
+      "type": "Credit card",
+      "scope": "Personal",
+      "lender": "ENBD",
+      "original": 5000,
+      "remaining": 0,
+      "interest": 0,
+      "monthlyMin": 500,
+      "notes": "settled",
+      "status": "settled",
+      "payments": [
+        { "id": "p1", "date": "2026-01-10", "amount": 1000, "isSettlement": true, "settledFullDebt": 5000, "savedAmount": 4000, "notes": "final" }
+      ]
+    }
+  ],
+  "invoices": [{ "id": "inv1" }],
+  "budgets": null,
+  "savings": [{ "id": "sv1", "date": "2026-01-01", "amount": 400, "label": "", "notes": "", "createdAt": "2026-01-01T10:00:00Z" }],
+  "savingsGoals": null,
+  "vatOutput": [
+    {
+      "id": "vo1",
+      "periodLabel": "Period 1",
+      "date": "2026-03-28",
+      "invoiceNo": "STRIPE",
+      "client": "Stripe – Session",
+      "vatRate": 0.05,
+      "netAmount": 242.86,
+      "vatAmount": 12.14,
+      "grossAmount": 255,
+      "treatment": "standard_rated",
+      "notes": ""
+    }
+  ],
+  "vatInput": [
+    {
+      "id": "vi1",
+      "periodLabel": "Period 1",
+      "date": "2026-03-02",
+      "supplier": "RAK Bank",
+      "description": "Account maintenance",
+      "invoiceRef": "Bank S1",
+      "grossAmount": 103.95,
+      "inputVat": 4.95,
+      "netAmount": 99,
+      "reclaimable": true,
+      "notes": ""
+    }
+  ],
+  "customCats": null
+}

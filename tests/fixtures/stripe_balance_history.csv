@@ -1,0 +1,4 @@
+id,Type,Description,Amount,Fee,Net,Currency,Created (UTC)
+ch_001,charge,Breathwork session,255.00,7.65,247.35,aed,2026-03-28 10:15:00
+ch_002,charge,Breathwork session,255.00,7.65,247.35,aed,2026-03-30 09:00:00
+po_001,payout,Payout to RAK Bank,-850.00,0,-850.00,aed,2026-04-02 06:00:00
