@@ -5,6 +5,7 @@ import { isFirstRun, runMigrations } from './lib/migrations.js'
 import { getItem } from './lib/storage.js'
 import { loadSeedOnFirstRun } from './lib/seed.js'
 import { RemountContext } from './lib/remountContext.js'
+import { NavigationContext } from './lib/navigationContext.js'
 import { applyTheme } from './theme.js'
 
 import Dashboard from './components/screens/Dashboard.jsx'
@@ -108,6 +109,7 @@ function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
     <ErrorBoundary>
       <ToastProvider>
         <RemountContext.Provider value={onRequestRemount}>
+        <NavigationContext.Provider value={selectScreen}>
           <div className="app-shell">
             <nav className="sidebar" aria-label="Primary">
               {SIDEBAR_ITEMS.map((item) => (
@@ -158,6 +160,7 @@ function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
               </div>
             )}
           </div>
+        </NavigationContext.Provider>
         </RemountContext.Provider>
       </ToastProvider>
     </ErrorBoundary>

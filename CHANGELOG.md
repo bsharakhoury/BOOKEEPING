@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0 — Business and Duplicates screens
+
+- **Business (L&H)**: was still the literal Phase-1 stub (`Coming in Phase 4.`) — neither Phase 2 ("Transactions" only) nor Phase 4 ("Income, Subscriptions, Savings, Debt") had actually been assigned this screen from the phase list, even though the Screens section fully specifies it. Built per spec: filters transactions to `ledger` in `{business, lh_business}` and `type` in `{expense, refund}`, month chips, hero total, quick-access buttons to Invoices and VAT, and a full transaction table.
+- `src/lib/navigationContext.js`: new `NavigationContext` + `useNavigate()` (mirrors the existing `RemountContext` pattern) so a screen can jump to another screen — needed for Business's "Invoices →" / "VAT →" quick-access buttons. Wired into `App.jsx` alongside the remount provider.
+- **Duplicates**: was also still the Phase-1 stub (`Coming in Phase 3.`) — Phase 3 only covered duplicate flagging during import, never a standalone screen, so this was another gap the phase list never closed. Built per spec: exact and fuzzy detection, "keep this one" (deletes the other transactions in a group, with Undo), "ignore group" (persists the group's key so it won't resurface).
+- `src/lib/duplicates.js`: `findDuplicateGroups()` now returns `{ key, transactions }` objects instead of bare arrays, giving each group a stable key to persist an "ignore" decision against (`Dashboard.jsx`'s existing `.length` usage is unaffected by the shape change). Added `findFuzzyDuplicateGroups()`: same amount, dates within a configurable day window, merchant names that overlap once normalised — excluding anything already caught by the exact matcher, so a pair is never reported twice.
+- `src/lib/migrations.js`: bumped `SCHEMA_VERSION` to 3, added a migration seeding `ignoredDuplicates: []` for the new "ignore group" persistence.
+- Verified live in the browser against seeded data: Business correctly totals and filters by month, both quick-access buttons navigate correctly; Duplicates correctly separates an exact match (same bankRef) from a fuzzy match (same amount, adjacent dates, overlapping merchant name), "keep this one" removes the duplicate with a working Undo toast, and the group count updates live.
+
 ## 0.8.0 — Phase 7: Polish
 
 - **Dark mode**: Settings → new "Appearance" section (System/Light/Dark), applying and persisting instantly — the toggle was previously invisible plumbing (`applyTheme()` ran once from stored settings on load, but nothing ever let the user change `settings.theme`).

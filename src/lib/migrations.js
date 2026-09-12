@@ -2,7 +2,7 @@ import { getItem, setItem } from './storage.js'
 import { DEFAULT_CATEGORIES } from '../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../data/accounts.js'
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 const DEFAULT_COLLECTIONS = {
   transactions: [],
@@ -38,6 +38,14 @@ const migrations = [
       }
       if (getItem('accounts', undefined) === undefined) {
         setItem('accounts', DEFAULT_ACCOUNTS)
+      }
+    }
+  },
+  {
+    version: 3,
+    run: () => {
+      if (getItem('ignoredDuplicates', undefined) === undefined) {
+        setItem('ignoredDuplicates', [])
       }
     }
   }
