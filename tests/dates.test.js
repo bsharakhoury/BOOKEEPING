@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, lastNMonthKeys, monthRange, quarterRange, ytdRange } from '../src/lib/dates.js'
+import { addDays, lastNMonthKeys, monthKeysInRange, monthRange, quarterRange, ytdRange } from '../src/lib/dates.js'
 
 describe('addDays', () => {
   it('adds days, rolling over month boundaries', () => {
@@ -25,6 +25,20 @@ describe('quarterRange', () => {
 describe('ytdRange', () => {
   it('runs from Jan 1 through the end of the given month', () => {
     expect(ytdRange('2026-09')).toEqual({ start: '2026-01-01', end: '2026-09-30' })
+  })
+})
+
+describe('monthKeysInRange', () => {
+  it('lists every month from start to end inclusive, rolling across a year boundary', () => {
+    expect(monthKeysInRange('2025-11', '2026-02')).toEqual(['2025-11', '2025-12', '2026-01', '2026-02'])
+  })
+
+  it('swaps out-of-order start/end', () => {
+    expect(monthKeysInRange('2026-02', '2025-12')).toEqual(['2025-12', '2026-01', '2026-02'])
+  })
+
+  it('returns a single month when start equals end', () => {
+    expect(monthKeysInRange('2026-05', '2026-05')).toEqual(['2026-05'])
   })
 })
 

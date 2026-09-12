@@ -1,4 +1,4 @@
-import { lastNMonthKeys, monthKey, monthLabel, todayISO } from '../dates.js'
+import { lastNMonthKeys, monthKey, monthKeysInRange, monthLabel, monthRange, todayISO } from '../dates.js'
 import { invoiceSubtotal } from './invoices.js'
 
 function round2(value) {
@@ -141,6 +141,76 @@ export function lhProfitAndLoss(transactions, invoices, categories, range) {
     productionCosts: round2(productionCosts),
     opex: round2(opex),
     net: round2(revenue - productionCosts - opex)
+  }
+}
+
+// Custom-range report: pick a month range, a set of ledgers, and a set of category names, and
+// get totals + per-month averages for each selected category, plus a month-by-month breakdown.
+// Mirrors the previous app's Reports screen (date range + ledger + category pickers).
+export function customRangeReport(transactions, categories, { startMonth, endMonth, ledgers, categoryNames }) {
+  const months = monthKeysInRange(startMonth, endMonth)
+  const monthCount = months.length || 1
+  const { start } = monthRange(months[0])
+  const { end } = monthRange(months[months.length - 1])
+
+  const ledgerSet = new Set(ledgers)
+  const categorySet = categoryNames ? new Set(categoryNames) : null
+  const categoryByName = new Map(categories.map((c) => [c.name, c]))
+
+  const inRange = transactions.filter((txn) => {
+    if (txn.date < start || txn.date > end) return false
+    if (txn.type === 'transfer') return false
+    if (!ledgerSet.has(txn.ledger)) return false
+    if (categorySet && !categorySet.has(txn.category)) return false
+    return true
+  })
+
+  function bucketBy(rows, type) {
+    const totals = new Map()
+    rows
+      .filter((txn) => (type === 'income' ? txn.type === 'income' : txn.type === 'expense' || txn.type === 'refund'))
+      .forEach((txn) => {
+        const signedAmount = txn.type === 'refund' ? -Number(txn.amount || 0) : Number(txn.amount || 0)
+        totals.set(txn.category, round2((totals.get(txn.category) || 0) + signedAmount))
+      })
+    return Array.from(totals.entries())
+      .map(([name, amount]) => ({
+        name,
+        color: categoryByName.get(name)?.color || null,
+        amount,
+        avgPerMonth: round2(amount / monthCount)
+      }))
+      .sort((a, b) => b.amount - a.amount)
+  }
+
+  const incomeByCategory = bucketBy(inRange, 'income')
+  const expensesByCategory = bucketBy(inRange, 'expense')
+
+  const netIncome = round2(incomeByCategory.reduce((sum, row) => sum + row.amount, 0))
+  const totalExpenses = round2(expensesByCategory.reduce((sum, row) => sum + row.amount, 0))
+  const netPosition = round2(netIncome - totalExpenses)
+  const avgMonthlyNet = round2(netPosition / monthCount)
+
+  const monthly = months.map((key) => {
+    const rows = inRange.filter((txn) => monthKey(txn.date) === key)
+    const income = round2(rows.filter((txn) => txn.type === 'income').reduce((sum, txn) => sum + Number(txn.amount || 0), 0))
+    const expense = round2(
+      rows
+        .filter((txn) => txn.type === 'expense' || txn.type === 'refund')
+        .reduce((sum, txn) => sum + (txn.type === 'refund' ? -Number(txn.amount || 0) : Number(txn.amount || 0)), 0)
+    )
+    const net = round2(income - expense)
+    const vsAvg = round2(net - avgMonthlyNet)
+    return { month: key, label: monthLabel(key), income, expense, net, vsAvg }
+  })
+
+  return {
+    months,
+    monthCount,
+    incomeByCategory,
+    expensesByCategory,
+    summary: { netIncome, totalExpenses, netPosition, avgMonthlyNet },
+    monthly
   }
 }
 

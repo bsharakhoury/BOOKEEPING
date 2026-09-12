@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Card } from '../ui/Card.jsx'
 import { Chip } from '../ui/Chip.jsx'
 import { Table } from '../ui/Table.jsx'
+import { CategoryTag } from '../ui/CategoryTag.jsx'
 import { usePersistedState } from '../../lib/storage.js'
 import { formatMoney } from '../../lib/money.js'
 import { formatDate, monthKey, monthLabel } from '../../lib/dates.js'
@@ -71,7 +72,7 @@ export default function Income() {
   const columns = [
     { key: 'date', label: 'Date', render: (txn) => formatDate(txn.date) },
     { key: 'merchant', label: 'Source' },
-    { key: 'category', label: 'Category' },
+    { key: 'category', label: 'Category', render: (txn) => <CategoryTag name={txn.category} categories={categories} /> },
     { key: 'stream', label: 'Stream', render: (txn) => STREAM_LABELS[streamByCategory.get(txn.category) || 'none'] },
     { key: 'client', label: 'Client', render: (txn) => clientFromTags(txn.tags) || '—' },
     { key: 'amount', label: 'Amount', render: (txn) => <span className="money money--income">{formatMoney(txn.amount)}</span> },

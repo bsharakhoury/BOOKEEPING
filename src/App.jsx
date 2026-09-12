@@ -22,24 +22,24 @@ import Duplicates from './components/screens/Duplicates.jsx'
 import Settings from './components/screens/Settings.jsx'
 
 const PRIMARY_TABS = [
-  { id: 'dashboard', label: 'Dashboard', Component: Dashboard },
-  { id: 'transactions', label: 'Transactions', Component: Transactions },
-  { id: 'income', label: 'Income', Component: Income },
-  { id: 'business', label: 'Business', Component: Business }
+  { id: 'dashboard', label: 'Dashboard', icon: '📊', Component: Dashboard },
+  { id: 'transactions', label: 'Transactions', icon: '📋', Component: Transactions },
+  { id: 'income', label: 'Income', icon: '💰', Component: Income },
+  { id: 'business', label: 'Business', icon: '💼', Component: Business }
 ]
 
 const MORE_ITEMS = [
-  { id: 'subscriptions', label: 'Subscriptions', Component: Subscriptions },
-  { id: 'debt', label: 'Debt', Component: Debt },
-  { id: 'savings', label: 'Savings', Component: Savings },
-  { id: 'reports', label: 'Reports', Component: Reports },
-  { id: 'duplicates', label: 'Duplicates', Component: Duplicates },
-  { id: 'settings', label: 'Settings', Component: Settings }
+  { id: 'subscriptions', label: 'Subscriptions', icon: '🔄', Component: Subscriptions },
+  { id: 'debt', label: 'Debt', icon: '⚖️', Component: Debt },
+  { id: 'savings', label: 'Savings', icon: '🏦', Component: Savings },
+  { id: 'reports', label: 'Reports', icon: '📈', Component: Reports },
+  { id: 'duplicates', label: 'Duplicates', icon: '⚠️', Component: Duplicates },
+  { id: 'settings', label: 'Settings', icon: '⚙️', Component: Settings }
 ]
 
 const SECONDARY_ITEMS = [
-  { id: 'invoices', label: 'Invoices', Component: Invoices },
-  { id: 'vat', label: 'VAT', Component: Vat }
+  { id: 'invoices', label: 'Invoices', icon: '📄', Component: Invoices },
+  { id: 'vat', label: 'VAT', icon: '🧾', Component: Vat }
 ]
 
 const SIDEBAR_ITEMS = [...PRIMARY_TABS, ...SECONDARY_ITEMS, ...MORE_ITEMS]
@@ -119,6 +119,7 @@ function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
                   aria-current={screenId === item.id ? 'page' : undefined}
                   onClick={() => selectScreen(item.id)}
                 >
+                  <span className="nav-icon" aria-hidden="true">{item.icon}</span>
                   {item.label}
                 </button>
               ))}
@@ -136,6 +137,7 @@ function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
                   aria-current={screenId === item.id ? 'page' : undefined}
                   onClick={() => selectScreen(item.id)}
                 >
+                  <span className="nav-icon" aria-hidden="true">{item.icon}</span>
                   {item.label}
                 </button>
               ))}
@@ -144,6 +146,7 @@ function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
                 aria-current={isMoreActive ? 'page' : undefined}
                 onClick={() => setMoreOpen(true)}
               >
+                <span className="nav-icon" aria-hidden="true">⋯</span>
                 More
               </button>
             </nav>
@@ -153,6 +156,7 @@ function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
                 <div className="more-sheet__panel" onClick={(event) => event.stopPropagation()}>
                   {MORE_ITEMS.map((item) => (
                     <button key={item.id} className="more-sheet__item" onClick={() => selectScreen(item.id)}>
+                      <span className="nav-icon" aria-hidden="true">{item.icon}</span>
                       {item.label}
                     </button>
                   ))}

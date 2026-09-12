@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react'
 import { Chip } from '../ui/Chip.jsx'
 import { Table } from '../ui/Table.jsx'
+import { CategoryTag } from '../ui/CategoryTag.jsx'
 import { usePersistedState } from '../../lib/storage.js'
 import { useNavigate } from '../../lib/navigationContext.js'
 import { formatMoney } from '../../lib/money.js'
 import { formatDate, monthKey, monthLabel } from '../../lib/dates.js'
+import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 
 const LEDGER_LABELS = { business: 'Mashreq business', lh_business: 'Leaf & Hook' }
 const BUSINESS_LEDGERS = new Set(['business', 'lh_business'])
 
 export default function Business() {
   const [transactions] = usePersistedState('transactions', [])
+  const [categories] = usePersistedState('categories', DEFAULT_CATEGORIES)
   const [monthFilter, setMonthFilter] = useState('all')
   const navigate = useNavigate()
 
@@ -36,7 +39,7 @@ export default function Business() {
   const columns = [
     { key: 'date', label: 'Date', render: (txn) => formatDate(txn.date) },
     { key: 'merchant', label: 'Merchant' },
-    { key: 'category', label: 'Category' },
+    { key: 'category', label: 'Category', render: (txn) => <CategoryTag name={txn.category} categories={categories} /> },
     { key: 'ledger', label: 'Ledger', render: (txn) => LEDGER_LABELS[txn.ledger] ?? txn.ledger },
     { key: 'paymentMethod', label: 'Account' },
     {

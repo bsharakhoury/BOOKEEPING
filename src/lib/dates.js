@@ -71,6 +71,19 @@ export function lastNMonthKeys(today, count) {
   return keys
 }
 
+// All month keys from `startKey` through `endKey` inclusive, oldest first. Swaps the two if
+// given out of order.
+export function monthKeysInRange(startKey, endKey) {
+  let [start, end] = startKey <= endKey ? [startKey, endKey] : [endKey, startKey]
+  const keys = []
+  let key = start
+  while (key <= end) {
+    keys.push(key)
+    key = monthKey(addMonths(`${key}-01`, 1))
+  }
+  return keys
+}
+
 const MONTH_NAMES = {
   january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
   july: '07', august: '08', september: '09', october: '10', november: '11', december: '12'

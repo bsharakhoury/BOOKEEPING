@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../ui/Modal.jsx'
 import { Field } from '../ui/Field.jsx'
-import { Table } from '../ui/Table.jsx'
-import { Chip } from '../ui/Chip.jsx'
-import { ConfirmInline } from '../ui/ConfirmInline.jsx'
 import { Card } from '../ui/Card.jsx'
+import { Stat } from '../ui/Stat.jsx'
+import { CategoryTag } from '../ui/CategoryTag.jsx'
+import { ConfirmInline } from '../ui/ConfirmInline.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import { usePersistedState } from '../../lib/storage.js'
 import { generateId } from '../../lib/id.js'
@@ -14,14 +14,11 @@ import { annualCost, findPaymentForSubscription, priceChangeFlag, rollForwardDue
 import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 
-const LEDGER_CHIPS = [
-  { id: 'all', label: 'All' },
+const LEDGER_SECTIONS = [
   { id: 'personal', label: 'Personal' },
-  { id: 'business', label: 'Mashreq business' },
+  { id: 'business', label: 'Business' },
   { id: 'lh_business', label: 'Leaf & Hook' }
 ]
-
-const LEDGER_LABELS = { personal: 'Personal', business: 'Mashreq business', lh_business: 'Leaf & Hook' }
 
 const FREQUENCY_OPTIONS = [
   { id: 'monthly', label: 'Monthly' },
@@ -29,6 +26,8 @@ const FREQUENCY_OPTIONS = [
   { id: 'biannual', label: 'Biannual' },
   { id: 'yearly', label: 'Yearly' }
 ]
+
+const REMINDER_WINDOW_DAYS = 15
 
 function emptyForm() {
   return {
@@ -110,9 +109,9 @@ function SubscriptionModal({ open, editing, categories, accounts, onClose, onSav
         </Field>
         <Field label="Ledger">
           <select value={form.ledger} onChange={(event) => updateField('ledger', event.target.value)}>
-            {LEDGER_CHIPS.filter((chip) => chip.id !== 'all').map((chip) => (
-              <option key={chip.id} value={chip.id}>
-                {chip.label}
+            {LEDGER_SECTIONS.map((section) => (
+              <option key={section.id} value={section.id}>
+                {section.label}
               </option>
             ))}
           </select>
@@ -195,15 +194,63 @@ function SubscriptionModal({ open, editing, categories, accounts, onClose, onSav
   )
 }
 
+function daysUntil(dateStr, today) {
+  return Math.round((new Date(dateStr) - new Date(today)) / 86400000)
+}
+
+function DueLabel({ nextDue, today }) {
+  const days = daysUntil(nextDue, today)
+  if (days < 0) return <span className="due-overdue">Next: {formatDate(nextDue)} (overdue)</span>
+  if (days === 0) return <span className="due-soon">Next: {formatDate(nextDue)} (today)</span>
+  if (days <= REMINDER_WINDOW_DAYS) return <span className="due-soon">Next: {formatDate(nextDue)} ({days}d)</span>
+  return (
+    <span className="settings-list__meta">
+      Next: {formatDate(nextDue)} ({days}d)
+    </span>
+  )
+}
+
+function SubscriptionRow({ sub, categories, today, onEdit, onToggle, onDelete }) {
+  const monthlyEq = sub.frequency === 'monthly' ? null : annualCost(sub) / 12
+  return (
+    <li className="sub-row">
+      <div className="sub-row__info">
+        <button type="button" className="link-button sub-row__name" onClick={() => onEdit(sub)}>
+          {sub.name}
+        </button>
+        <div className="sub-row__meta">
+          <CategoryTag name={sub.category} categories={categories} />
+          <DueLabel nextDue={sub.nextDue} today={today} />
+          {sub.priceChanged && <span className="dup-flag">Price changed</span>}
+        </div>
+      </div>
+      <div className="sub-row__actions">
+        <div className="sub-row__amount">
+          <span className="money money--expense">
+            {formatMoney(sub.amount)}/{sub.frequency === 'monthly' ? 'mo' : 'yr'}
+          </span>
+          {monthlyEq != null && <span className="settings-list__meta">≈{formatMoney(monthlyEq)}/mo</span>}
+        </div>
+        <button type="button" className={sub.active ? 'sub-toggle sub-toggle--on' : 'sub-toggle'} onClick={() => onToggle(sub)}>
+          {sub.active ? 'ON' : 'OFF'}
+        </button>
+        <button type="button" onClick={() => onEdit(sub)}>
+          Edit
+        </button>
+        <ConfirmInline label="Delete" confirmLabel="Confirm" onConfirm={() => onDelete(sub)} />
+      </div>
+    </li>
+  )
+}
+
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = usePersistedState('subscriptions', [])
   const [categories] = usePersistedState('categories', DEFAULT_CATEGORIES)
   const [accounts] = usePersistedState('accounts', DEFAULT_ACCOUNTS)
   const [transactions] = usePersistedState('transactions', [])
   const showToast = useToast()
+  const today = todayISO()
 
-  const [ledgerFilter, setLedgerFilter] = useState('all')
-  const [showAnnual, setShowAnnual] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSub, setEditingSub] = useState(null)
 
@@ -223,12 +270,34 @@ export default function Subscriptions() {
     [subscriptions, transactions]
   )
 
-  const filtered = useMemo(
-    () => (ledgerFilter === 'all' ? enriched : enriched.filter((sub) => sub.ledger === ledgerFilter)),
-    [enriched, ledgerFilter]
+  const active = useMemo(() => enriched.filter((sub) => sub.active), [enriched])
+
+  const comingUp = useMemo(
+    () =>
+      active
+        .filter((sub) => sub.nextDue && daysUntil(sub.nextDue, today) <= REMINDER_WINDOW_DAYS)
+        .sort((a, b) => (a.nextDue < b.nextDue ? -1 : 1)),
+    [active, today]
   )
 
-  const annualTotal = useMemo(() => filtered.filter((sub) => sub.active).reduce((sum, sub) => sum + annualCost(sub), 0), [filtered])
+  const monthlyByLedger = useMemo(() => {
+    const totals = {}
+    LEDGER_SECTIONS.forEach((section) => {
+      totals[section.id] = active
+        .filter((sub) => sub.ledger === section.id && sub.frequency === 'monthly')
+        .reduce((sum, sub) => sum + Number(sub.amount || 0), 0)
+    })
+    return totals
+  }, [active])
+
+  const nonMonthly = useMemo(() => enriched.filter((sub) => sub.frequency !== 'monthly'), [enriched])
+  const nonMonthlyMonthlyEquiv = useMemo(
+    () => active.filter((sub) => sub.frequency !== 'monthly').reduce((sum, sub) => sum + annualCost(sub) / 12, 0),
+    [active]
+  )
+
+  const trueMonthlyTotal =
+    monthlyByLedger.personal + monthlyByLedger.business + monthlyByLedger.lh_business + nonMonthlyMonthlyEquiv
 
   const installmentTxns = useMemo(() => transactions.filter((txn) => txn.installment && txn.installment.endMonth), [transactions])
 
@@ -263,57 +332,6 @@ export default function Subscriptions() {
     })
   }
 
-  const columns = [
-    {
-      key: 'name',
-      label: 'Name',
-      render: (sub) => (
-        <button type="button" className="link-button" onClick={() => openEdit(sub)}>
-          {sub.name}
-        </button>
-      )
-    },
-    { key: 'category', label: 'Category' },
-    { key: 'ledger', label: 'Ledger', render: (sub) => LEDGER_LABELS[sub.ledger] ?? sub.ledger },
-    {
-      key: 'amount',
-      label: showAnnual ? 'Annual cost' : 'Amount',
-      render: (sub) => (
-        <span className="money money--expense">{formatMoney(showAnnual ? annualCost(sub) : sub.amount)}</span>
-      )
-    },
-    { key: 'frequency', label: 'Frequency', render: (sub) => FREQUENCY_OPTIONS.find((f) => f.id === sub.frequency)?.label ?? sub.frequency },
-    {
-      key: 'due',
-      label: 'Due',
-      render: (sub) =>
-        sub.matched ? (
-          <span className="money money--income">Paid ✓ {formatDate(sub.matched.date)}</span>
-        ) : (
-          formatDate(sub.nextDue)
-        )
-    },
-    {
-      key: 'price',
-      label: '',
-      render: (sub) => (sub.priceChanged ? <span className="dup-flag">Price changed</span> : null)
-    },
-    {
-      key: 'active',
-      label: 'Status',
-      render: (sub) => (
-        <button type="button" className="link-button" onClick={() => toggleActive(sub)}>
-          {sub.active ? 'Active' : 'Inactive'}
-        </button>
-      )
-    },
-    {
-      key: 'actions',
-      label: '',
-      render: (sub) => <ConfirmInline label="Delete" confirmLabel="Confirm" onConfirm={() => handleDelete(sub)} />
-    }
-  ]
-
   return (
     <div className="screen">
       <div className="screen-header">
@@ -322,27 +340,84 @@ export default function Subscriptions() {
           Add subscription
         </button>
       </div>
+      <p className="settings-hint">Fixed recurring charges. Yearly subs show monthly equivalent — not counted in monthly total.</p>
 
-      <div className="chip-row">
-        {LEDGER_CHIPS.map((chip) => (
-          <Chip key={chip.id} label={chip.label} active={ledgerFilter === chip.id} onClick={() => setLedgerFilter(chip.id)} />
-        ))}
+      {comingUp.length > 0 && (
+        <div className="reminder-banner">
+          <strong>Coming up:</strong>{' '}
+          {comingUp
+            .map((sub) => `${sub.name} — ${formatMoney(sub.amount)} on ${formatDate(sub.nextDue)} (${daysUntil(sub.nextDue, today)}d)`)
+            .join(' · ')}
+        </div>
+      )}
+
+      <div className="dashboard-cards">
+        <Card title="Personal monthly">
+          <Stat value={formatMoney(monthlyByLedger.personal)} tone="expense" />
+          <span className="settings-hint">active monthly only</span>
+        </Card>
+        <Card title="Business monthly">
+          <Stat value={formatMoney(monthlyByLedger.business)} tone="expense" />
+          <span className="settings-hint">active monthly only</span>
+        </Card>
+        <Card title="Leaf & Hook monthly">
+          <Stat value={formatMoney(monthlyByLedger.lh_business)} tone="expense" />
+          <span className="settings-hint">active monthly only</span>
+        </Card>
+        <Card title="Non-monthly — monthly eq.">
+          <Stat value={formatMoney(nonMonthlyMonthlyEquiv)} tone="expense" />
+          <span className="settings-hint">not a real monthly cost</span>
+        </Card>
+        <Card title="True monthly total">
+          <Stat value={formatMoney(trueMonthlyTotal)} tone="expense" />
+          <span className="settings-hint">incl. yearly spread</span>
+        </Card>
       </div>
 
-      <Card className="subscriptions-summary">
-        <div className="screen-header">
-          <span>
-            {showAnnual ? 'Annual cost' : 'Active subscriptions'} total:{' '}
-            <span className="money money--expense">{formatMoney(annualTotal)}</span>
-            {showAnnual ? '' : ' / year'}
-          </span>
-          <button type="button" onClick={() => setShowAnnual((prev) => !prev)}>
-            {showAnnual ? 'Show periodic amounts' : 'Show annual cost'}
-          </button>
-        </div>
-      </Card>
+      {nonMonthly.length > 0 && (
+        <section className="settings-section">
+          <h2>Non-monthly</h2>
+          <p className="settings-hint">Paid in full, shown as monthly equivalent. Not added to your monthly total.</p>
+          <ul className="settings-list">
+            {nonMonthly.map((sub) => (
+              <SubscriptionRow
+                key={sub.id}
+                sub={sub}
+                categories={categories}
+                today={today}
+                onEdit={openEdit}
+                onToggle={toggleActive}
+                onDelete={handleDelete}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
 
-      <Table columns={columns} rows={filtered} emptyMessage="No subscriptions yet." />
+      {LEDGER_SECTIONS.map((section) => {
+        const rows = enriched.filter((sub) => sub.ledger === section.id && sub.frequency === 'monthly')
+        if (rows.length === 0) return null
+        return (
+          <section className="settings-section" key={section.id}>
+            <h2>{section.label} — monthly</h2>
+            <ul className="settings-list">
+              {rows.map((sub) => (
+                <SubscriptionRow
+                  key={sub.id}
+                  sub={sub}
+                  categories={categories}
+                  today={today}
+                  onEdit={openEdit}
+                  onToggle={toggleActive}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </ul>
+          </section>
+        )
+      })}
+
+      {enriched.length === 0 && <div className="table-empty">No subscriptions yet.</div>}
 
       <section className="settings-section">
         <h2>Installments</h2>

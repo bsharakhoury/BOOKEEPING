@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal.jsx'
 import { Field } from '../ui/Field.jsx'
 import { Table } from '../ui/Table.jsx'
 import { Chip } from '../ui/Chip.jsx'
+import { CategoryTag } from '../ui/CategoryTag.jsx'
 import { ConfirmInline } from '../ui/ConfirmInline.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import { ImportBox } from '../import/ImportBox.jsx'
@@ -431,7 +432,7 @@ export default function Transactions() {
         </button>
       )
     },
-    { key: 'category', label: 'Category' },
+    { key: 'category', label: 'Category', render: (txn) => <CategoryTag name={txn.category} categories={categories} /> },
     { key: 'ledger', label: 'Ledger', render: (txn) => LEDGER_LABELS[txn.ledger] ?? txn.ledger },
     { key: 'paymentMethod', label: 'Account' },
     {

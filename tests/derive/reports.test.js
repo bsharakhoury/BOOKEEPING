@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   cashFlowSeries,
   categoryTrend,
+  customRangeReport,
   incomeByClient,
   incomeByStream,
   lhProfitAndLoss,
@@ -73,6 +74,61 @@ describe('lhProfitAndLoss', () => {
     const range = { start: '2026-09-01', end: '2026-09-30' }
     const result = lhProfitAndLoss(transactions, [], categories, range)
     expect(result).toEqual({ revenue: 1000, productionCosts: 600, opex: 50, net: 350 })
+  })
+})
+
+describe('customRangeReport', () => {
+  const rangeTxns = [
+    { date: '2026-08-05', type: 'income', ledger: 'income', category: 'Salary – Beno', amount: 5000 },
+    { date: '2026-08-06', type: 'expense', ledger: 'personal', category: 'Food (Groceries)', amount: 300 },
+    { date: '2026-09-05', type: 'income', ledger: 'income', category: 'Salary – Beno', amount: 5000 },
+    { date: '2026-09-06', type: 'expense', ledger: 'personal', category: 'Food (Groceries)', amount: 400 },
+    { date: '2026-09-07', type: 'refund', ledger: 'personal', category: 'Food (Groceries)', amount: 50 },
+    { date: '2026-09-09', type: 'expense', ledger: 'business', category: 'Marketing', amount: 999 } // excluded: wrong ledger
+  ]
+  const rangeCategories = [
+    { name: 'Salary – Beno', type: 'income', color: 'var(--color-sage)' },
+    { name: 'Food (Groceries)', type: 'expense', color: 'var(--color-sage)' },
+    { name: 'Marketing', type: 'expense', color: 'var(--color-amber)' }
+  ]
+
+  it('filters by ledger and category, totals and averages per category over the range', () => {
+    const report = customRangeReport(rangeTxns, rangeCategories, {
+      startMonth: '2026-08',
+      endMonth: '2026-09',
+      ledgers: ['income', 'personal'],
+      categoryNames: ['Salary – Beno', 'Food (Groceries)']
+    })
+
+    expect(report.monthCount).toBe(2)
+    expect(report.incomeByCategory).toEqual([{ name: 'Salary – Beno', color: 'var(--color-sage)', amount: 10000, avgPerMonth: 5000 }])
+    expect(report.expensesByCategory).toEqual([
+      { name: 'Food (Groceries)', color: 'var(--color-sage)', amount: 650, avgPerMonth: 325 } // 300 + 400 - 50
+    ])
+    expect(report.summary).toEqual({ netIncome: 10000, totalExpenses: 650, netPosition: 9350, avgMonthlyNet: 4675 })
+  })
+
+  it('excludes ledgers and categories not selected', () => {
+    const report = customRangeReport(rangeTxns, rangeCategories, {
+      startMonth: '2026-08',
+      endMonth: '2026-09',
+      ledgers: ['income', 'personal'],
+      categoryNames: ['Salary – Beno', 'Food (Groceries)']
+    })
+    expect(report.expensesByCategory.find((row) => row.name === 'Marketing')).toBeUndefined()
+  })
+
+  it('builds a month-by-month breakdown with vs-average deltas', () => {
+    const report = customRangeReport(rangeTxns, rangeCategories, {
+      startMonth: '2026-08',
+      endMonth: '2026-09',
+      ledgers: ['income', 'personal'],
+      categoryNames: ['Salary – Beno', 'Food (Groceries)']
+    })
+    expect(report.monthly).toEqual([
+      { month: '2026-08', label: 'Aug 2026', income: 5000, expense: 300, net: 4700, vsAvg: 25 },
+      { month: '2026-09', label: 'Sep 2026', income: 5000, expense: 350, net: 4650, vsAvg: -25 }
+    ])
   })
 })
 
