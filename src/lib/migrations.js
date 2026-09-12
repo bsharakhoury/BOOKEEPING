@@ -2,7 +2,7 @@ import { getItem, setItem } from './storage.js'
 import { DEFAULT_CATEGORIES } from '../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../data/accounts.js'
 
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 const DEFAULT_COLLECTIONS = {
   transactions: [],
@@ -46,6 +46,15 @@ const migrations = [
     run: () => {
       if (getItem('ignoredDuplicates', undefined) === undefined) {
         setItem('ignoredDuplicates', [])
+      }
+    }
+  },
+  {
+    version: 4,
+    run: () => {
+      const settings = getItem('settings', {})
+      if (!settings.googleSheets) {
+        setItem('settings', { ...settings, googleSheets: { clientId: '', sheetId: '', connected: false, lastSyncedAt: null } })
       }
     }
   }

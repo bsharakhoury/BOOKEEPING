@@ -24,6 +24,7 @@ function readRaw(key) {
 function writeRaw(key, value) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value))
+    window.dispatchEvent(new CustomEvent('mf:write', { detail: { key } }))
   } catch {
     // storage unavailable or quota exceeded — fail silently, in-memory state still works
   }

@@ -6,6 +6,7 @@ import { getItem } from './lib/storage.js'
 import { loadSeedOnFirstRun } from './lib/seed.js'
 import { RemountContext } from './lib/remountContext.js'
 import { NavigationContext } from './lib/navigationContext.js'
+import { useGoogleSheetsAutoSync } from './lib/useGoogleSheetsAutoSync.js'
 import { applyTheme } from './theme.js'
 
 import Dashboard from './components/screens/Dashboard.jsx'
@@ -46,6 +47,8 @@ const SIDEBAR_ITEMS = [...PRIMARY_TABS, ...SECONDARY_ITEMS, ...MORE_ITEMS]
 
 function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
   const [moreOpen, setMoreOpen] = useState(false)
+
+  useGoogleSheetsAutoSync()
 
   useEffect(() => {
     const firstRun = isFirstRun()

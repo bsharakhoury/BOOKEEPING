@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0 — Google Sheets backup
+
+The app's own storage is browser localStorage only — no cloud backup of any kind. The previous
+app had a live Google Sheets sync as a real off-device backup; this restores that.
+
+- `src/lib/googleSheetsSync.js`: loads Google Identity Services lazily (only when the user opens this feature, not on every page load), requests an OAuth access token scoped to `spreadsheets` (silent mode for auto-sync, consent-popup mode for the first connect), and `pushTransactionsToSheet()` mirrors the current transaction list into the sheet's "Transactions" tab by clearing the range and rewriting it — so edits and deletes in the app disappear from the sheet too, rather than leaving an ever-growing append log.
+- `src/lib/storage.js`: `writeRaw()` now dispatches a `mf:write` window event on every write. This app has no shared reactive store (each screen reads its own local copy on mount), so this is the only way to notice "the transactions list changed" regardless of which screen — Transactions, an import, the legacy importer, Duplicates — made the change.
+- `src/lib/useGoogleSheetsAutoSync.js`: listens for that event and, when sync is connected, pushes to the sheet ~5 seconds after the last change. Mounted once at the `App.jsx` shell level so it runs no matter which screen is active. A failed silent token refresh (e.g. the browser session's Google consent expired) marks sync as disconnected rather than popping up a Google sign-in window unprompted.
+- **Settings → Google Sheets backup**: new section — OAuth Client ID + Sheet ID fields, Connect/Reconnect, manual Sync now, Disconnect, and a status line with the last-synced time. Needs a Google Cloud OAuth Client ID (Web application type, authorized origin `https://bsharakhoury.github.io`) set up once outside the app — this is an account-level step only the user can do, so I can't automate it.
+- `src/lib/migrations.js`: bumped `SCHEMA_VERSION` to 4, added a migration seeding `settings.googleSheets = { clientId: '', sheetId: '', connected: false, lastSyncedAt: null }`.
+- Verified in the browser: the Connect flow genuinely loads Google's real Identity Services library and attempts a real OAuth consent popup (blocked by the sandboxed browser's popup policy, as expected in an automated environment — the actual popup click has to happen in a real browser); the empty-fields validation message and the popup-failure error both surface cleanly with no crash. The write→event→debounced-push chain is covered by `tests/googleSheetsSync.test.js` with a mocked fetch (clear-then-write sequence, both failure paths, and the row-mapping itself).
+
 ## 0.10.0 — Design polish, Reports custom range, Subscriptions restructure
 
 Brought back design and functionality from the original My-Financials app (inspected live at bsharakhoury.github.io/My-Financials), per direct request after reviewing it side-by-side with the current build.

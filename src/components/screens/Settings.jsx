@@ -13,6 +13,7 @@ import { useToast } from '../ui/Toast.jsx'
 import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 import { mapLegacyBackup, mergeById, mergeVatAdjustments, parseLegacyBackup } from '../../lib/legacyImport.js'
+import { pushTransactionsToSheet, requestAccessToken } from '../../lib/googleSheetsSync.js'
 
 const LEDGER_CHOICES = [
   { id: 'personal', label: 'Personal' },
@@ -289,6 +290,61 @@ export default function Settings() {
     setSettingsState(nextSettings)
     setItem('settings', nextSettings)
     applyTheme(theme)
+  }
+
+  const [gsBusy, setGsBusy] = useState(false)
+  const [gsStatus, setGsStatus] = useState('')
+
+  function updateGoogleSheets(patch) {
+    const nextGoogleSheets = { ...(settings.googleSheets || {}), ...patch }
+    const nextSettings = { ...settings, googleSheets: nextGoogleSheets }
+    setSettingsState(nextSettings)
+    setItem('settings', nextSettings)
+  }
+
+  async function handleConnectGoogleSheets() {
+    const { clientId, sheetId } = settings.googleSheets || {}
+    if (!clientId || !sheetId) {
+      setGsStatus('Enter both a Client ID and a Sheet ID first.')
+      return
+    }
+    setGsBusy(true)
+    setGsStatus('Requesting Google permission…')
+    try {
+      const token = await requestAccessToken(clientId, { silent: false })
+      const transactions = getItem('transactions', [])
+      const result = await pushTransactionsToSheet({ accessToken: token, sheetId, transactions })
+      updateGoogleSheets({ connected: true, lastSyncedAt: new Date().toISOString() })
+      setGsStatus(`Connected — synced ${result.rowCount} transaction${result.rowCount === 1 ? '' : 's'}.`)
+    } catch (error) {
+      setGsStatus(error.message || 'Could not connect to Google Sheets.')
+    } finally {
+      setGsBusy(false)
+    }
+  }
+
+  async function handleSyncNow() {
+    const { clientId, sheetId } = settings.googleSheets || {}
+    if (!clientId || !sheetId) return
+    setGsBusy(true)
+    setGsStatus('Syncing…')
+    try {
+      const token = await requestAccessToken(clientId, { silent: true })
+      const transactions = getItem('transactions', [])
+      const result = await pushTransactionsToSheet({ accessToken: token, sheetId, transactions })
+      updateGoogleSheets({ lastSyncedAt: new Date().toISOString() })
+      setGsStatus(`Synced ${result.rowCount} transaction${result.rowCount === 1 ? '' : 's'}.`)
+    } catch {
+      updateGoogleSheets({ connected: false })
+      setGsStatus('Session expired — click Connect to reconnect.')
+    } finally {
+      setGsBusy(false)
+    }
+  }
+
+  function handleDisconnectGoogleSheets() {
+    updateGoogleSheets({ connected: false })
+    setGsStatus('Disconnected.')
   }
 
   function persistCategories(next) {
@@ -676,6 +732,48 @@ export default function Settings() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="settings-section">
+        <h2>Google Sheets backup</h2>
+        <p className="settings-hint">
+          Mirrors your transactions to a Google Sheet automatically as you add or edit them — a real off-device backup, unlike
+          this app's own storage which lives only in this browser. Needs a Google Cloud OAuth Client ID and the target sheet's
+          ID (from its URL).
+        </p>
+        <Field label="OAuth Client ID">
+          <input
+            value={settings.googleSheets?.clientId || ''}
+            onChange={(event) => updateGoogleSheets({ clientId: event.target.value })}
+            placeholder="xxxxx.apps.googleusercontent.com"
+          />
+        </Field>
+        <Field label="Sheet ID" hint="From the sheet's URL: docs.google.com/spreadsheets/d/THIS_PART/edit">
+          <input
+            value={settings.googleSheets?.sheetId || ''}
+            onChange={(event) => updateGoogleSheets({ sheetId: event.target.value })}
+            placeholder="1xYMuROUj1-6X89rEo1oYAEmw76Hf2sY0YiYSQxgnKa0"
+          />
+        </Field>
+        <div className="settings-actions">
+          <button type="button" onClick={handleConnectGoogleSheets} disabled={gsBusy}>
+            {settings.googleSheets?.connected ? 'Reconnect' : 'Connect'}
+          </button>
+          {settings.googleSheets?.connected && (
+            <>
+              <button type="button" onClick={handleSyncNow} disabled={gsBusy}>
+                Sync now
+              </button>
+              <ConfirmInline label="Disconnect" confirmLabel="Confirm" onConfirm={handleDisconnectGoogleSheets} />
+            </>
+          )}
+        </div>
+        {gsStatus && <p className="settings-hint">{gsStatus}</p>}
+        {settings.googleSheets?.connected && settings.googleSheets?.lastSyncedAt && (
+          <p className="settings-hint">
+            Connected · last synced {formatDate(settings.googleSheets.lastSyncedAt)} · auto-syncs a few seconds after any change.
+          </p>
         )}
       </section>
 
