@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { detect } from '../../lib/parsers/index.js'
+import { parseMashreqStatementFile } from '../../lib/parsers/mashreqStatement.js'
 import { Field } from '../ui/Field.jsx'
 
 export function ImportBox({ onParsed, fxRates }) {
@@ -12,7 +13,7 @@ export function ImportBox({ onParsed, fxRates }) {
     const parser = detect({ text, fileName })
     if (!parser) {
       setError(
-        "Couldn't recognise this text or file. Supported: Mashreq SMS, RAK Bank (statement text or Account_Transactions_CSV), Stripe CSV."
+        "Couldn't recognise this text or file. Supported: Mashreq SMS, Mashreq statement (.xlsx), RAK Bank (statement text or Account_Transactions_CSV), Stripe CSV."
       )
       return
     }
@@ -32,6 +33,24 @@ export function ImportBox({ onParsed, fxRates }) {
   async function handleFileSelected(event) {
     const file = event.target.files?.[0]
     if (!file) return
+
+    if (file.name.toLowerCase().endsWith('.xlsx')) {
+      setError('')
+      try {
+        const buffer = await file.arrayBuffer()
+        const rows = await parseMashreqStatementFile(buffer, { fxRates })
+        if (rows.length === 0) {
+          setError('Recognised this as a Mashreq statement but found no transactions in it.')
+        } else {
+          onParsed(rows, { parserId: 'mashreqStatement', label: 'Mashreq (statement .xlsx)', sourceName: file.name })
+        }
+      } catch (error) {
+        setError(error.message || "Couldn't read this .xlsx file.")
+      }
+      event.target.value = ''
+      return
+    }
+
     const text = await file.text()
     runDetectAndParse(text, file.name)
     event.target.value = ''
@@ -53,9 +72,15 @@ export function ImportBox({ onParsed, fxRates }) {
         </button>
         <span className="import-box__or">or</span>
         <button type="button" onClick={() => fileInputRef.current?.click()}>
-          Upload CSV
+          Upload CSV or Mashreq statement (.xlsx)
         </button>
-        <input ref={fileInputRef} type="file" accept=".csv,text/csv" hidden onChange={handleFileSelected} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          hidden
+          onChange={handleFileSelected}
+        />
       </div>
       {error && <p className="import-box__error">{error}</p>}
     </div>

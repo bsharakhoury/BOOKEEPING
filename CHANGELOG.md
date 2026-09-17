@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.0 — Mashreq statement (.xlsx) import
+
+- `src/lib/parsers/xlsxReader.js`: a dependency-free .xlsx reader — no new package, same spirit as this codebase's other from-scratch binary work (the CSV tokenizer, the PNG encoder). An .xlsx is a ZIP holding XML parts; this reads the ZIP central directory by hand and inflates just the two parts it needs (shared strings + the first worksheet) with the browser's built-in `DecompressionStream('deflate-raw')`, parsed with `DOMParser`.
+- `src/lib/parsers/mashreqStatement.js`: maps Mashreq's own "Account Transactions Statement" export into the app's transaction shape — Visa purchases/refunds, IPP transfers, account-to-account transfers, salary credits, ATM withdrawals/deposits, inward remittances, joining-benefit bonuses, cashback, wallet cash-outs, and minimum-balance/VAT fee pairs, each its own rule with its own test (13 rules, matching the rigor `mashreqSms.js` already has). Unlike SMS-derived amounts — which convert a merchant's foreign-currency figure through this app's own fixed FX table — every amount here is the bank's own already-settled AED figure, so no FX conversion happens in this parser at all.
+- Settings → Transactions → Import now accepts `.xlsx` uploads alongside CSV and pasted text; `ImportBox.jsx` routes `.xlsx` files to `parseMashreqStatementFile()` (reading as `arrayBuffer`, not `text()`, since it's binary) instead of through the text-based `detect()`.
+- Verified against all 8 of the user's real Jan–Aug 2026 statements (632 transactions total): every row classifies with zero "unrecognised" fallbacks, and the parsed count matches an independent Python/openpyxl extraction exactly, file by file. One rule (`STMT_IPP_TRANSFER`) needed a regex fix mid-verification — some transfers use a `/REF/` marker between name and purpose, others a raw code — both are now covered by their own test case.
+- Real statement files were read locally for verification (via Python for cross-checking, and via this parser directly) but never committed — the fixture in `tests/fixtures/mashreq_statement_sample.xlsx` is synthetic (fake account number, generic test merchant names), matching how the existing CSV fixtures were built.
+- This also gives a name to why SMS-derived foreign-currency subscription amounts (Spotify, Vimeo, Claude.ai, GoDaddy, etc.) have run consistently below the real charge for months: those entries convert through `settings.fx`'s fixed rate table, while Mashreq settles each one at that day's actual card rate — small, consistent gaps that this format doesn't have, since it already reports the settled AED amount directly.
+
 ## 0.11.0 — Google Sheets backup
 
 The app's own storage is browser localStorage only — no cloud backup of any kind. The previous

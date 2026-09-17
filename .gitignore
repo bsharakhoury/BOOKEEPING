@@ -8,3 +8,4 @@ dist
 /old-my-financials.json
 /my-financials-export-*.json
 /*.csv
+/EXCEL/
