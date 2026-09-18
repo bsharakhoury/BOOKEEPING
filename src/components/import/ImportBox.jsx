@@ -6,6 +6,7 @@ import { Field } from '../ui/Field.jsx'
 export function ImportBox({ onParsed, fxRates }) {
   const [pasteText, setPasteText] = useState('')
   const [error, setError] = useState('')
+  const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
 
   function runDetectAndParse(text, fileName) {
@@ -30,8 +31,7 @@ export function ImportBox({ onParsed, fxRates }) {
     runDetectAndParse(pasteText, '')
   }
 
-  async function handleFileSelected(event) {
-    const file = event.target.files?.[0]
+  async function handleFile(file) {
     if (!file) return
 
     if (file.name.toLowerCase().endsWith('.xlsx')) {
@@ -47,13 +47,29 @@ export function ImportBox({ onParsed, fxRates }) {
       } catch (error) {
         setError(error.message || "Couldn't read this .xlsx file.")
       }
-      event.target.value = ''
       return
     }
 
     const text = await file.text()
     runDetectAndParse(text, file.name)
+  }
+
+  async function handleFileSelected(event) {
+    const file = event.target.files?.[0]
+    await handleFile(file)
     event.target.value = ''
+  }
+
+  function handleDrop(event) {
+    event.preventDefault()
+    setDragOver(false)
+    const file = event.dataTransfer.files?.[0]
+    handleFile(file)
+  }
+
+  function handleDragOver(event) {
+    event.preventDefault()
+    setDragOver(true)
   }
 
   return (
@@ -81,6 +97,14 @@ export function ImportBox({ onParsed, fxRates }) {
           hidden
           onChange={handleFileSelected}
         />
+      </div>
+      <div
+        className={dragOver ? 'import-box__dropzone import-box__dropzone--active' : 'import-box__dropzone'}
+        onDragOver={handleDragOver}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
+        or drag a CSV or Mashreq statement (.xlsx) file here
       </div>
       {error && <p className="import-box__error">{error}</p>}
     </div>

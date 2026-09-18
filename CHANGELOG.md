@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.0 — Statement reconciliation, drag-and-drop import
+
+- `src/lib/parsers/reconcile.js`: matches freshly-parsed Mashreq statement rows against transactions already in the app for the same account and month — by merchant word overlap, not exact date/amount, since correcting the date and amount is usually the whole point of a re-import. Existing entries no statement row claims are flagged for review (a real card-authorization hold never posts to a statement, so this is exactly how one shows up). Never matches one existing transaction to two statement rows.
+- `src/components/import/ReconcilePreview.jsx`: new screen shown automatically when a `.xlsx` statement is uploaded — lists proposed date/amount corrections, lets you individually check which flagged (unmatched) entries to remove, then hands any genuinely new transactions to the normal import-preview screen for categorising, same as any other import.
+- `Transactions.jsx`: `handleReconcileApply` applies corrections and removals in one state update, with a single Undo toast restoring the exact prior state — consistent with every other destructive action in the app.
+- Verified against all of the user's real Jan–Aug 2026 data: 493 date/amount corrections, 119 genuinely new transactions, 50 flagged for review across the 8 months (a large share of the 65 initially flagged by an early version of the matcher turned out to be a token-matching blind spot — e.g. the statement's "DNHGODADDY" fusing a processor prefix onto "GODADDY" with no separator — fixed by adding substring containment to the merchant-token comparison, not by loosening what counts as a real match).
+- `ImportBox.jsx`: now also accepts a dropped file (drag-and-drop), reusing the exact same handling as the upload button and the `.xlsx` vs CSV/text branching — asked for directly, since re-importing eight monthly statements one at a time is much faster without a file-picker dialog each time. The paste-text box for SMS/statement text is unchanged and still there alongside it.
+- Verified live end-to-end in the browser (seeded a drifted subscription entry, a phantom hold, and a genuinely new transaction; dropped a real-shaped statement file): the correction applied with the right before/after amounts, the hold was removed only after being explicitly checked, and the new transaction flowed into the standard categorise-and-commit screen — each step's Undo toast restores state exactly.
+
 ## 0.12.0 — Mashreq statement (.xlsx) import
 
 - `src/lib/parsers/xlsxReader.js`: a dependency-free .xlsx reader — no new package, same spirit as this codebase's other from-scratch binary work (the CSV tokenizer, the PNG encoder). An .xlsx is a ZIP holding XML parts; this reads the ZIP central directory by hand and inflates just the two parts it needs (shared strings + the first worksheet) with the browser's built-in `DecompressionStream('deflate-raw')`, parsed with `DOMParser`.

@@ -647,6 +647,27 @@ button.primary,
   font-size: 0.85rem;
 }
 
+.import-box__dropzone {
+  margin-top: 12px;
+  padding: 16px;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.import-box__dropzone--active {
+  border-color: var(--color-navy);
+  color: var(--color-navy);
+  background: color-mix(in srgb, var(--color-navy) 6%, transparent);
+}
+
+:root[data-theme='dark'] .import-box__dropzone--active {
+  border-color: var(--color-teal);
+  color: var(--color-teal);
+}
+
 .import-preview-panel {
   display: flex;
   flex-direction: column;

@@ -8,16 +8,18 @@ import { ConfirmInline } from '../ui/ConfirmInline.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import { ImportBox } from '../import/ImportBox.jsx'
 import { ImportPreview } from '../import/ImportPreview.jsx'
+import { ReconcilePreview } from '../import/ReconcilePreview.jsx'
 import { usePersistedState, getItem, setItem } from '../../lib/storage.js'
 import { generateId } from '../../lib/id.js'
 import { formatMoney, parseMoney } from '../../lib/money.js'
 import { formatDate, monthKey, monthLabel, todayISO } from '../../lib/dates.js'
 import { filterTransactions } from '../../lib/transactionSearch.js'
+import { reconcileStatementRows } from '../../lib/parsers/reconcile.js'
 import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 import { DEFAULT_FX_RATES } from '../../lib/fx.js'
 
-const CSV_PARSER_IDS = new Set(['rakCsv', 'stripeCsv'])
+const CSV_PARSER_IDS = new Set(['rakCsv', 'stripeCsv', 'mashreqStatement'])
 function sourceForParser(parserId) {
   return CSV_PARSER_IDS.has(parserId) ? 'csv' : 'sms'
 }
@@ -243,19 +245,56 @@ function TransactionModal({ open, editing, categories, accounts, onClose, onSave
   )
 }
 
-function ImportModal({ open, categories, accounts, transactions, merchantRules, fxRates, onClose, onCommit }) {
+function ImportModal({ open, categories, accounts, transactions, merchantRules, fxRates, onClose, onCommit, onReconcileApply, showToast }) {
   const [parsed, setParsed] = useState(null) // { rawRows, meta }
+  const [reconcile, setReconcile] = useState(null) // { result, meta }
 
   function handleClose() {
     setParsed(null)
+    setReconcile(null)
     onClose()
+  }
+
+  function handleParsed(rawRows, meta) {
+    if (meta.parserId === 'mashreqStatement') {
+      const result = reconcileStatementRows(rawRows, transactions)
+      if (result.updates.length > 0 || result.flagged.length > 0) {
+        setReconcile({ result, meta })
+        return
+      }
+      if (result.additions.length === 0) {
+        showToast('Nothing to import — everything in this statement already matches your data.')
+        handleClose()
+        return
+      }
+      setParsed({ rawRows: result.additions, meta })
+      return
+    }
+    setParsed({ rawRows, meta })
   }
 
   return (
     <Modal open={open} title="Import transactions" onClose={handleClose}>
-      {!parsed ? (
-        <ImportBox fxRates={fxRates} onParsed={(rawRows, meta) => setParsed({ rawRows, meta })} />
-      ) : (
+      {!parsed && !reconcile && <ImportBox fxRates={fxRates} onParsed={handleParsed} />}
+      {reconcile && (
+        <ReconcilePreview
+          result={reconcile.result}
+          meta={reconcile.meta}
+          onCancel={() => setReconcile(null)}
+          onApply={(updates, deleteIds) => {
+            onReconcileApply(updates, deleteIds)
+            const additions = reconcile.result.additions
+            const meta = reconcile.meta
+            setReconcile(null)
+            if (additions.length === 0) {
+              handleClose()
+            } else {
+              setParsed({ rawRows: additions, meta })
+            }
+          }}
+        />
+      )}
+      {parsed && (
         <ImportPreview
           rawRows={parsed.rawRows}
           meta={parsed.meta}
@@ -421,6 +460,21 @@ export default function Transactions() {
     })
   }
 
+  function handleReconcileApply(updates, deleteIds) {
+    const snapshot = transactions
+    setTransactions((prev) => {
+      const kept = prev.filter((txn) => !deleteIds.includes(txn.id))
+      return kept.map((txn) => {
+        const update = updates.find((u) => u.id === txn.id)
+        return update ? { ...txn, ...update.after, updatedAt: new Date().toISOString() } : txn
+      })
+    })
+    showToast(
+      `${updates.length} entr${updates.length === 1 ? 'y' : 'ies'} corrected, ${deleteIds.length} removed`,
+      { actionLabel: 'Undo', onAction: () => setTransactions(snapshot) }
+    )
+  }
+
   const columns = [
     { key: 'date', label: 'Date', render: (txn) => formatDate(txn.date) },
     {
@@ -513,6 +567,8 @@ export default function Transactions() {
         fxRates={settings.fx || DEFAULT_FX_RATES}
         onClose={() => setImportModalOpen(false)}
         onCommit={handleImportCommit}
+        onReconcileApply={handleReconcileApply}
+        showToast={showToast}
       />
     </div>
   )
