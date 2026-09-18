@@ -2,7 +2,7 @@ import { MERCHANT_ALIASES } from './merchants.js'
 
 // merchantRules entries store `match` as either a plain substring (case-insensitive) or a
 // "/pattern/flags" string (stored as text since JSON can't hold a RegExp).
-function ruleMatches(rule, row) {
+export function ruleMatches(rule, row) {
   const target = row.rawMerchant || row.merchant || ''
   const source = String(rule.match || '')
   if (!source) return false

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.14.0 — Merchant rules management, suggested from history
+
+The app never actually learned merchant categorization automatically — checked the data directly:
+zero `merchantRules` existed anywhere in the user's history, and every correctly-categorized
+entry (e.g. 20 ENOC transactions all tagged `Transport (Fuel)`) got that way from manual work in
+the previous app, carried over verbatim by the legacy importer. `merchantRules` also had no
+Settings UI at all — CLAUDE.md's spec called for one, but it was only ever written to (via the
+"Remember merchant" checkbox during import), never viewable or editable.
+
+- **Settings → Merchant rules**: new section — full CRUD (add/edit/delete, each delete undoable) for rules that auto-categorise a transaction when its merchant text contains a given string. This is the exact mechanism `categorise.js` already used for every import; it just had no visible home in Settings until now.
+- `src/lib/merchantRuleSuggestions.js`: scans the transactions already in the app and proposes a rule for any merchant that appeared 2+ times with the same category ≥85% of the time — strips the legacy "Purchase with Card ending NNNN at" prefix first, takes a short 1-2 word brand keyword (matching how the existing substring-based rule engine already works), and skips merchants already covered by a rule. Ambiguous merchants (e.g. Amazon.ae, which spans Personal expenses/Home/Personal care) are correctly left alone rather than forced into one wrong bucket.
+- "Suggest rules from my history" button runs this against the live transaction list and shows a checkbox preview (occurrence count + consistency %) before adding anything — same review-then-confirm pattern as the statement reconciler.
+- Verified live in the browser: seeded ENOC (3x, consistent), AFNAN SUPERMARKET (2x, consistent), and Amazon.ae (3x, inconsistent categories) — the suggester correctly proposed rules for the first two only. After adding them, pasting a brand-new ENOC SMS auto-selected Transport (Fuel) with no manual categorisation, closing the exact gap the user asked about.
+
 ## 0.13.0 — Statement reconciliation, drag-and-drop import
 
 - `src/lib/parsers/reconcile.js`: matches freshly-parsed Mashreq statement rows against transactions already in the app for the same account and month — by merchant word overlap, not exact date/amount, since correcting the date and amount is usually the whole point of a re-import. Existing entries no statement row claims are flagged for review (a real card-authorization hold never posts to a statement, so this is exactly how one shows up). Never matches one existing transaction to two statement rows.

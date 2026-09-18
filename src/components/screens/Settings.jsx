@@ -14,6 +14,7 @@ import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 import { mapLegacyBackup, mergeById, mergeVatAdjustments, parseLegacyBackup } from '../../lib/legacyImport.js'
 import { pushTransactionsToSheet, requestAccessToken } from '../../lib/googleSheetsSync.js'
+import { suggestMerchantRules } from '../../lib/merchantRuleSuggestions.js'
 
 const LEDGER_CHOICES = [
   { id: 'personal', label: 'Personal' },
@@ -254,6 +255,86 @@ function AccountModal({ open, editing, onClose, onSave }) {
   )
 }
 
+function emptyMerchantRuleForm() {
+  return { match: '', merchant: '', category: '', ledger: 'personal' }
+}
+
+function MerchantRuleModal({ open, editing, categories, onClose, onSave }) {
+  const [form, setForm] = useState(emptyMerchantRuleForm)
+
+  useEffect(() => {
+    if (!open) return
+    setForm(
+      editing
+        ? { match: editing.match, merchant: editing.merchant || '', category: editing.category || '', ledger: editing.ledger || 'personal' }
+        : emptyMerchantRuleForm()
+    )
+  }, [open, editing])
+
+  const categoryOptions = categories.filter((category) => !category.archived && category.ledger === form.ledger)
+
+  function updateField(field, value) {
+    setForm((prev) => {
+      const next = { ...prev, [field]: value }
+      if (field === 'ledger') next.category = ''
+      return next
+    })
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    if (!form.match.trim() || !form.category) return
+    onSave({
+      match: form.match.trim(),
+      merchant: form.merchant.trim() || null,
+      category: form.category,
+      ledger: form.ledger
+    })
+  }
+
+  return (
+    <Modal open={open} title={editing ? 'Edit merchant rule' : 'Add merchant rule'} onClose={onClose}>
+      <form className="settings-form" onSubmit={handleSubmit}>
+        <Field label="Match text" hint="Any transaction whose merchant text contains this (case-insensitive)">
+          <input value={form.match} onChange={(event) => updateField('match', event.target.value)} placeholder="e.g. ENOC" required />
+        </Field>
+        <Field label="Ledger">
+          <select value={form.ledger} onChange={(event) => updateField('ledger', event.target.value)}>
+            {LEDGER_CHOICES.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Category">
+          <select value={form.category} onChange={(event) => updateField('category', event.target.value)} required>
+            <option value="" disabled>
+              Select a category
+            </option>
+            {categoryOptions.map((category) => (
+              <option key={category.id} value={category.name}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Clean merchant name" hint="optional — overrides the display name">
+          <input value={form.merchant} onChange={(event) => updateField('merchant', event.target.value)} placeholder="e.g. Enoc" />
+        </Field>
+        <div className="transaction-form__actions">
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary">
+            {editing ? 'Save changes' : 'Add rule'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 function countCollections(data) {
   return Object.entries(data).map(([key, value]) => ({
     key,
@@ -272,6 +353,12 @@ export default function Settings() {
   const [editingCategory, setEditingCategory] = useState(null)
   const [accountModalOpen, setAccountModalOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState(null)
+
+  const [merchantRules, setMerchantRules] = useState(() => getItem('merchantRules', []))
+  const [merchantRuleModalOpen, setMerchantRuleModalOpen] = useState(false)
+  const [editingMerchantRule, setEditingMerchantRule] = useState(null)
+  const [merchantRuleSuggestions, setMerchantRuleSuggestions] = useState(null) // array or null
+  const [checkedSuggestions, setCheckedSuggestions] = useState(() => new Set())
 
   const [importPreview, setImportPreview] = useState(null) // { data, counts }
   const [importMode, setImportMode] = useState('merge')
@@ -393,6 +480,66 @@ export default function Settings() {
 
   function toggleCategoryArchived(category) {
     persistCategories(categories.map((c) => (c.id === category.id ? { ...c, archived: !c.archived } : c)))
+  }
+
+  function persistMerchantRules(next) {
+    setMerchantRules(next)
+    setItem('merchantRules', next)
+  }
+
+  function openAddMerchantRule() {
+    setEditingMerchantRule(null)
+    setMerchantRuleModalOpen(true)
+  }
+
+  function openEditMerchantRule(rule) {
+    setEditingMerchantRule(rule)
+    setMerchantRuleModalOpen(true)
+  }
+
+  function saveMerchantRule(fields) {
+    if (editingMerchantRule) {
+      persistMerchantRules(merchantRules.map((r) => (r.id === editingMerchantRule.id ? { ...r, ...fields } : r)))
+    } else {
+      persistMerchantRules([...merchantRules, { id: generateId(), ...fields }])
+    }
+    setMerchantRuleModalOpen(false)
+  }
+
+  function deleteMerchantRule(rule) {
+    persistMerchantRules(merchantRules.filter((r) => r.id !== rule.id))
+    showToast(`Deleted rule "${rule.match}"`, {
+      actionLabel: 'Undo',
+      onAction: () => persistMerchantRules([...merchantRules, rule])
+    })
+  }
+
+  function handleSuggestMerchantRules() {
+    const transactions = getItem('transactions', [])
+    const suggestions = suggestMerchantRules(transactions, merchantRules)
+    setMerchantRuleSuggestions(suggestions)
+    setCheckedSuggestions(new Set(suggestions.map((_, index) => index)))
+  }
+
+  function toggleSuggestion(index) {
+    setCheckedSuggestions((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
+
+  function applySuggestedRules() {
+    const toAdd = merchantRuleSuggestions
+      .filter((_, index) => checkedSuggestions.has(index))
+      .map((s) => ({ id: generateId(), match: s.match, merchant: null, category: s.category, ledger: s.ledger }))
+    persistMerchantRules([...merchantRules, ...toAdd])
+    showToast(`Added ${toAdd.length} merchant rule${toAdd.length === 1 ? '' : 's'}`, {
+      actionLabel: 'Undo',
+      onAction: () => persistMerchantRules(merchantRules)
+    })
+    setMerchantRuleSuggestions(null)
   }
 
   function openAddAccount() {
@@ -620,6 +767,82 @@ export default function Settings() {
       </section>
 
       <section className="settings-section">
+        <div className="screen-header">
+          <h2>Merchant rules</h2>
+          <div className="settings-actions">
+            <button type="button" onClick={handleSuggestMerchantRules}>
+              Suggest rules from my history
+            </button>
+            <button type="button" className="primary" onClick={openAddMerchantRule}>
+              Add rule
+            </button>
+          </div>
+        </div>
+        <p className="settings-hint">
+          Automatically sets a category on future imports (SMS or statement) when the merchant text matches. Also created
+          automatically when you tick "Remember merchant" during an import.
+        </p>
+        {merchantRules.length === 0 ? (
+          <p className="settings-hint">No merchant rules yet.</p>
+        ) : (
+          <ul className="settings-list">
+            {merchantRules.map((rule) => (
+              <li key={rule.id} className="settings-list__item">
+                <button type="button" className="link-button" onClick={() => openEditMerchantRule(rule)}>
+                  {rule.match}
+                </button>
+                <span className="settings-list__meta">
+                  → {rule.category} · {LEDGER_CHOICES.find((l) => l.id === rule.ledger)?.label ?? rule.ledger}
+                </span>
+                <ConfirmInline label="Delete" confirmLabel="Confirm" onConfirm={() => deleteMerchantRule(rule)} />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {merchantRuleSuggestions && (
+          <div className="import-preview">
+            {merchantRuleSuggestions.length === 0 ? (
+              <p className="settings-hint">No new rules to suggest — nothing in your history has a merchant with a consistent category yet.</p>
+            ) : (
+              <>
+                <p className="settings-hint">
+                  Found {merchantRuleSuggestions.length} merchant{merchantRuleSuggestions.length === 1 ? '' : 's'} with a consistent
+                  category in your history. Uncheck any you don't want.
+                </p>
+                <ul className="settings-list">
+                  {merchantRuleSuggestions.map((s, index) => (
+                    <li key={s.match} className="settings-list__item">
+                      <input
+                        type="checkbox"
+                        checked={checkedSuggestions.has(index)}
+                        onChange={() => toggleSuggestion(index)}
+                        aria-label={`Add rule for ${s.match}`}
+                      />
+                      <span>{s.match}</span>
+                      <span className="settings-list__meta">
+                        → {s.category} · seen {s.occurrences} times ({Math.round(s.confidence * 100)}% consistent)
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <div className="transaction-form__actions">
+              <button type="button" onClick={() => setMerchantRuleSuggestions(null)}>
+                Cancel
+              </button>
+              {merchantRuleSuggestions.length > 0 && (
+                <button type="button" className="primary" onClick={applySuggestedRules} disabled={checkedSuggestions.size === 0}>
+                  Add {checkedSuggestions.size} rule{checkedSuggestions.size === 1 ? '' : 's'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="settings-section">
         <h2>Data</h2>
         <div className="settings-actions">
           <button type="button" onClick={handleExport}>
@@ -824,6 +1047,13 @@ export default function Settings() {
         onSave={saveCategory}
       />
       <AccountModal open={accountModalOpen} editing={editingAccount} onClose={() => setAccountModalOpen(false)} onSave={saveAccount} />
+      <MerchantRuleModal
+        open={merchantRuleModalOpen}
+        editing={editingMerchantRule}
+        categories={categories}
+        onClose={() => setMerchantRuleModalOpen(false)}
+        onSave={saveMerchantRule}
+      />
     </div>
   )
 }
