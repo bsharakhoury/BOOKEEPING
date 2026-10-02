@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.18.0 — Import several statement files at once; app updates no longer lag a reload
+
+- The import box now accepts **multiple files** at once (choose or drag several): a RAK history file plus the monthly ones go in as a single import and a single review. `src/lib/parsers/multiFile.js` merges them newest-first and drops a row only when it repeats an overlapping file's row on date, amount, type, text *and* the bank's running balance (or its own reference), so two genuinely identical charges on one day (different balances) are both kept. Mixing different kinds of statement (RAK with Mashreq) is refused with a clear message, since they reconcile against different accounts. Errors name the offending file.
+- **Stale-app fix:** the service worker was cache-first for the page itself, so after a deploy the browser kept showing the previous version until a second reload (it's why a newly shipped feature can look missing). The page is now network-first (falling back to the cached copy offline); hashed build assets stay cache-first. Cache bumped to v2 so the old one is cleared.
+- Verified live: two RAK .txt files dropped together → "2 files · 4 rows" from 5 input rows, overlapping row dropped, newest first.
+
 ## 0.17.0 — RAK Bank statement import, VAT-aware, with reconciliation
 
 Built from five real RAK files (three PDFs spanning May 2025 → Jun 2026, two monthly .txt exports): every file's running balance chains correctly row to row, so the 131 unique transactions are trustworthy.

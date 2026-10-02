@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react'
 import { detect } from '../../lib/parsers/index.js'
 import { parseMashreqStatementFile } from '../../lib/parsers/mashreqStatement.js'
+import { mergeParsedFiles } from '../../lib/parsers/multiFile.js'
 import { Field } from '../ui/Field.jsx'
+
+const UNRECOGNISED_MESSAGE =
+  "Couldn't recognise this text or file. Supported: Mashreq SMS, Mashreq statement (.xlsx), RAK Bank (statement .txt, statement text or Account_Transactions_CSV), Stripe CSV."
 
 export function ImportBox({ onParsed, fxRates }) {
   const [pasteText, setPasteText] = useState('')
@@ -13,9 +17,7 @@ export function ImportBox({ onParsed, fxRates }) {
     setError('')
     const parser = detect({ text, fileName })
     if (!parser) {
-      setError(
-        "Couldn't recognise this text or file. Supported: Mashreq SMS, Mashreq statement (.xlsx), RAK Bank (statement .txt, statement text or Account_Transactions_CSV), Stripe CSV."
-      )
+      setError(UNRECOGNISED_MESSAGE)
       return
     }
     const rows = parser.parse(text, { fxRates })
@@ -31,40 +33,52 @@ export function ImportBox({ onParsed, fxRates }) {
     runDetectAndParse(pasteText, '')
   }
 
-  async function handleFile(file) {
-    if (!file) return
-
-    if (file.name.toLowerCase().endsWith('.xlsx')) {
-      setError('')
+  // Reads one statement file into { fileName, parserId, label, rows }, or throws a readable error.
+  async function parseFile(file) {
+    const fileName = file.name
+    if (fileName.toLowerCase().endsWith('.xlsx')) {
+      const buffer = await file.arrayBuffer()
+      let rows
       try {
-        const buffer = await file.arrayBuffer()
-        const rows = await parseMashreqStatementFile(buffer, { fxRates })
-        if (rows.length === 0) {
-          setError('Recognised this as a Mashreq statement but found no transactions in it.')
-        } else {
-          onParsed(rows, { parserId: 'mashreqStatement', label: 'Mashreq (statement .xlsx)', sourceName: file.name })
-        }
+        rows = await parseMashreqStatementFile(buffer, { fxRates })
       } catch (error) {
-        setError(error.message || "Couldn't read this .xlsx file.")
+        throw new Error(`${fileName}: ${error.message || "couldn't read this .xlsx file."}`)
       }
-      return
+      if (rows.length === 0) throw new Error(`${fileName}: recognised as a Mashreq statement but found no transactions in it.`)
+      return { fileName, parserId: 'mashreqStatement', label: 'Mashreq (statement .xlsx)', rows }
     }
 
     const text = await file.text()
-    runDetectAndParse(text, file.name)
+    const parser = detect({ text, fileName })
+    if (!parser) throw new Error(`${fileName}: ${UNRECOGNISED_MESSAGE}`)
+    const rows = parser.parse(text, { fxRates })
+    if (rows.length === 0) throw new Error(`${fileName}: recognised the format but found no transactions in it.`)
+    return { fileName, parserId: parser.id, label: parser.label, rows }
+  }
+
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList || [])
+    if (files.length === 0) return
+    setError('')
+    try {
+      const results = []
+      for (const file of files) results.push(await parseFile(file))
+      const merged = mergeParsedFiles(results)
+      onParsed(merged.rows, { parserId: merged.parserId, label: merged.label, sourceName: merged.sourceName })
+    } catch (error) {
+      setError(error.message)
+    }
   }
 
   async function handleFileSelected(event) {
-    const file = event.target.files?.[0]
-    await handleFile(file)
+    await handleFiles(event.target.files)
     event.target.value = ''
   }
 
   function handleDrop(event) {
     event.preventDefault()
     setDragOver(false)
-    const file = event.dataTransfer.files?.[0]
-    handleFile(file)
+    handleFiles(event.dataTransfer.files)
   }
 
   function handleDragOver(event) {
@@ -88,11 +102,12 @@ export function ImportBox({ onParsed, fxRates }) {
         </button>
         <span className="import-box__or">or</span>
         <button type="button" onClick={() => fileInputRef.current?.click()}>
-          Upload statement (.txt, .csv or Mashreq .xlsx)
+          Choose statement files (.txt, .csv, .xlsx)
         </button>
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           accept=".csv,text/csv,.txt,text/plain,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           hidden
           onChange={handleFileSelected}
@@ -104,7 +119,7 @@ export function ImportBox({ onParsed, fxRates }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
-        or drag a statement file here (RAK .txt, Mashreq .xlsx, CSV)
+        or drag one or more statement files here (RAK .txt, Mashreq .xlsx, CSV)
       </div>
       {error && <p className="import-box__error">{error}</p>}
     </div>
