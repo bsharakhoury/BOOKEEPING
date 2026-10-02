@@ -14,7 +14,7 @@ import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 import { mapLegacyBackup, mergeById, mergeVatAdjustments, parseLegacyBackup } from '../../lib/legacyImport.js'
 import { pushTransactionsToSheet, requestAccessToken } from '../../lib/googleSheetsSync.js'
-import { suggestMerchantRules } from '../../lib/merchantRuleSuggestions.js'
+import { mergeMerchantRules, suggestMerchantRules } from '../../lib/merchantRuleSuggestions.js'
 
 const LEDGER_CHOICES = [
   { id: 'personal', label: 'Personal' },
@@ -359,6 +359,7 @@ export default function Settings() {
   const [editingMerchantRule, setEditingMerchantRule] = useState(null)
   const [merchantRuleSuggestions, setMerchantRuleSuggestions] = useState(null) // array or null
   const [checkedSuggestions, setCheckedSuggestions] = useState(() => new Set())
+  const rulesFileInputRef = useRef(null)
 
   const [importPreview, setImportPreview] = useState(null) // { data, counts }
   const [importMode, setImportMode] = useState('merge')
@@ -512,6 +513,36 @@ export default function Settings() {
       actionLabel: 'Undo',
       onAction: () => persistMerchantRules([...merchantRules, rule])
     })
+  }
+
+  function handleExportMerchantRules() {
+    const blob = new Blob([JSON.stringify(merchantRules, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `merchant-rules-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleImportMerchantRulesFile(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try {
+      const parsed = JSON.parse(await file.text())
+      const incoming = Array.isArray(parsed) ? parsed : parsed.merchantRules
+      if (!Array.isArray(incoming)) throw new Error('not a rules list')
+      const previous = merchantRules
+      const { merged, addedCount } = mergeMerchantRules(previous, incoming, generateId)
+      persistMerchantRules(merged)
+      showToast(
+        addedCount === 0 ? 'No new rules — everything in that file is already here.' : `Added ${addedCount} merchant rule${addedCount === 1 ? '' : 's'}`,
+        addedCount === 0 ? undefined : { actionLabel: 'Undo', onAction: () => persistMerchantRules(previous) }
+      )
+    } catch {
+      showToast("Couldn't read that file as a merchant rules list.")
+    }
+    event.target.value = ''
   }
 
   function handleSuggestMerchantRules() {
@@ -770,6 +801,15 @@ export default function Settings() {
         <div className="screen-header">
           <h2>Merchant rules</h2>
           <div className="settings-actions">
+            <button type="button" onClick={() => rulesFileInputRef.current?.click()}>
+              Import rules
+            </button>
+            <input ref={rulesFileInputRef} type="file" accept="application/json,.json" hidden onChange={handleImportMerchantRulesFile} />
+            {merchantRules.length > 0 && (
+              <button type="button" onClick={handleExportMerchantRules}>
+                Export rules
+              </button>
+            )}
             <button type="button" onClick={handleSuggestMerchantRules}>
               Suggest rules from my history
             </button>

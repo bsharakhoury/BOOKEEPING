@@ -9,3 +9,5 @@ dist
 /my-financials-export-*.json
 /*.csv
 /EXCEL/
+/merchant-rules-seed.json
+/merchant-rules-*.json

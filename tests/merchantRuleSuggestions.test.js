@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { suggestMerchantRules } from '../src/lib/merchantRuleSuggestions.js'
+import { mergeMerchantRules, suggestMerchantRules } from '../src/lib/merchantRuleSuggestions.js'
 
 function txn(overrides) {
   return { rawMerchant: 'ENOC SITE 7825, DUBAI', category: 'Transport (Fuel)', ledger: 'personal', ...overrides }
@@ -56,6 +56,41 @@ describe('suggestMerchantRules', () => {
     expect(suggestMerchantRules(transactions, existingRules)).toHaveLength(0)
   })
 
+  it('ignores currency/city noise in bank-statement merchant text when picking the keyword', () => {
+    const transactions = [
+      txn({ rawMerchant: 'SMARTDXBGOV-PRKN AED DUBAI AE', category: 'Transport (Public/Taxi)' }),
+      txn({ rawMerchant: 'SMARTDXBGOV-PRKN AED DUBAI AE', category: 'Transport (Public/Taxi)' })
+    ]
+    const suggestions = suggestMerchantRules(transactions, [])
+    expect(suggestions).toHaveLength(1)
+    expect(suggestions[0].match).toBe('SMARTDXBGOV-PRKN')
+  })
+
+  it('does not suggest a rule that merely restates the default "Personal expenses" category', () => {
+    const transactions = [
+      txn({ rawMerchant: 'AIR PUFF SMOKING ACCESS', category: 'Personal expenses' }),
+      txn({ rawMerchant: 'AIR PUFF SMOKING ACCESS', category: 'Personal expenses' })
+    ]
+    expect(suggestMerchantRules(transactions, [])).toHaveLength(0)
+  })
+
+  it('only learns from expenses, not income or transfers', () => {
+    const transactions = [
+      txn({ rawMerchant: 'BENO TECHNOLOGIES FZCO', category: 'Salary – Beno', type: 'income' }),
+      txn({ rawMerchant: 'BENO TECHNOLOGIES FZCO', category: 'Salary – Beno', type: 'income' })
+    ]
+    expect(suggestMerchantRules(transactions, [])).toHaveLength(0)
+  })
+
+  it('uses the ledger the winning category was most often filed under', () => {
+    const transactions = [
+      txn({ rawMerchant: 'SQSP* WORKSP#1', category: 'Business subscription', ledger: 'business' }),
+      txn({ rawMerchant: 'SQSP* WORKSP#2', category: 'Business subscription', ledger: 'business' }),
+      txn({ rawMerchant: 'SQSP* WORKSP#3', category: 'Business subscription', ledger: 'business' })
+    ]
+    expect(suggestMerchantRules(transactions, [])[0]).toMatchObject({ category: 'Business subscription', ledger: 'business' })
+  })
+
   it('sorts suggestions by occurrence count, most frequent first', () => {
     const transactions = [
       txn({ rawMerchant: 'CAREEM FOOD A' }),
@@ -69,5 +104,30 @@ describe('suggestMerchantRules', () => {
     // substring-match any future "AL AFNAN SUPERMARKET ..." description just fine.
     expect(suggestions[0].match).toBe('AFNAN SUPERMARKET')
     expect(suggestions[0].occurrences).toBe(3)
+  })
+})
+
+describe('mergeMerchantRules', () => {
+  let n = 0
+  const makeId = () => `id-${++n}`
+
+  it('adds new rules and keeps existing ones untouched', () => {
+    const existing = [{ id: 'a', match: 'ENOC', category: 'Transport (Fuel)', ledger: 'personal' }]
+    const incoming = [{ match: 'CAREEM FOOD', category: 'Food (Eating Out)', ledger: 'personal' }]
+    const { merged, addedCount } = mergeMerchantRules(existing, incoming, makeId)
+    expect(addedCount).toBe(1)
+    expect(merged).toHaveLength(2)
+    expect(merged[0]).toBe(existing[0])
+  })
+
+  it('skips a rule whose match text already exists, ignoring case', () => {
+    const existing = [{ id: 'a', match: 'ENOC', category: 'Transport (Fuel)', ledger: 'personal' }]
+    const { addedCount } = mergeMerchantRules(existing, [{ match: 'enoc', category: 'Something Else' }], makeId)
+    expect(addedCount).toBe(0)
+  })
+
+  it('ignores entries missing a match text or category, and de-duplicates within the file', () => {
+    const incoming = [{ match: '', category: 'X' }, { match: 'Y' }, { match: 'SPOTIFY', category: 'Personal subscription' }, { match: 'Spotify', category: 'Personal subscription' }]
+    expect(mergeMerchantRules([], incoming, makeId).addedCount).toBe(1)
   })
 })

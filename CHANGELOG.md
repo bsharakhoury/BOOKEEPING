@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.15.0 — Merchant rules learned from the user's own history, importable from a file
+
+Checked the previous app's actual code: it has no learning logic at all (its SMS importer files every
+expense under "Personal expenses"). The correct categories in the user's history are their own manual
+edits, preserved in the backup — so that's the knowledge this release extracts.
+
+- `suggestMerchantRules` is sharper: skips currency/city/legal-suffix noise in bank-statement text ("AED DUBAI AE", "LLC"), strips glued invoice suffixes (`WORKSP#237…`) and reference codes (`P3E86D7BF3`) that were splitting one merchant into many groups, learns from purchases only (never income/transfers, whose categories come from dedicated parser rules), picks the ledger the winning category was actually filed under, and no longer proposes rules that merely restate the default "Personal expenses".
+- `reconcileStatementRows` now also returns every statement↔history pairing (`matches`), so a statement's spelling of a merchant ("ROAD AND TRANSPORT AUT") can be tied to the category the user already gave it.
+- Settings → Merchant rules: **Import rules** (merges a JSON list by match text — never duplicates, existing rules win, undoable) and **Export rules** (backup / move between devices).
+- Generated a 101-rule starter set from the 986-transaction history plus the 8 real Jan–Aug 2026 Mashreq statements (491 matched pairs), reviewed by hand: dropped person-to-person transfers, a rule that would have overridden the built-in Carrefour→Groceries alias, income categories on expense rows, and one-sighting noise. It lives only in a git-ignored local file (it reflects personal spending, e.g. a therapy provider), loaded via Import rules.
+
 ## 0.14.0 — Merchant rules management, suggested from history
 
 The app never actually learned merchant categorization automatically — checked the data directly:

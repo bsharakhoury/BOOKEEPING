@@ -36,6 +36,7 @@ export function reconcileStatementRows(statementRows, existingTransactions) {
   const consumed = new Set()
   const updates = []
   const additions = []
+  const matches = []
 
   for (const row of statementRows) {
     const rowTokens = tokenSet(row.rawMerchant)
@@ -61,6 +62,7 @@ export function reconcileStatementRows(statementRows, existingTransactions) {
     }
 
     consumed.add(best.id)
+    matches.push({ existing: best, row })
     const dateChanged = best.date !== row.date
     const amountChanged = Math.round(Number(best.amount) * 100) !== Math.round(row.amount * 100)
     if (dateChanged || amountChanged) {
@@ -74,5 +76,5 @@ export function reconcileStatementRows(statementRows, existingTransactions) {
 
   const flagged = candidates.filter((existing) => !consumed.has(existing.id))
 
-  return { updates, additions, flagged }
+  return { updates, additions, flagged, matches }
 }
