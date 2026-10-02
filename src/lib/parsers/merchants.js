@@ -1,7 +1,7 @@
 // Built-in raw-merchant → clean-name (+ optional default category) aliases. These apply before
 // any user-defined merchantRule is even consulted by categorise.js — they're bank-string quirks,
 // not personal preferences.
-export const MERCHANT_ALIASES = [{ match: /MAJID AL FUTTAIM HM/i, merchant: 'Carrefour', category: 'Food (Groceries)' }]
+export const MERCHANT_ALIASES = [{ match: /MAJID AL ?FUTTAIM HM/i, merchant: 'Carrefour', category: 'Food (Groceries)' }]
 
 function titleCase(text) {
   return text.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase())

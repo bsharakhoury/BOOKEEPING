@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.0 — Built-in merchant rules (no import step)
+
+- `src/data/defaultMerchantRules.js`: 98 starter rules built into the app, learned from the user's own categorisation history and their 8 Mashreq statements — fuel stations, supermarkets, taxis/RTA, Careem, common SaaS subscriptions. `categorise()` now consults the user's own `merchantRules` first, then these built-ins (longest match first), then the existing aliases — so a rule added in Settings always overrides a built-in, and every device gets them without importing anything.
+- Measured against the user's real data: of 491 statement purchases that could be paired to a transaction they'd categorised by hand, 72 (15%) came out right with no rules; 338 (69%) now do. Remaining misses are mostly merchants the user's own history files inconsistently (Amazon, Tabby, Carrefour split between Groceries and Eating Out).
+- Bug fix found by that measurement: the built-in Carrefour alias matched `MAJID AL FUTTAIM HM` but the bank statement writes `MAJID ALFUTTAIM HM` (no space), so it never fired on any statement row. Now matches both.
+- Deliberately NOT in this public file: rules that would reveal personal details (a named person, a medical provider, a private loan, supplier names). Those stay in the user's git-ignored local starter file and load through Settings → Merchant rules → Import rules.
+- Settings → Merchant rules notes the built-in count, and "Suggest rules from my history" no longer re-proposes anything the built-ins already cover.
+
 ## 0.15.0 — Merchant rules learned from the user's own history, importable from a file
 
 Checked the previous app's actual code: it has no learning logic at all (its SMS importer files every

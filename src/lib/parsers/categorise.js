@@ -1,4 +1,5 @@
 import { MERCHANT_ALIASES } from './merchants.js'
+import { DEFAULT_MERCHANT_RULES } from '../../data/defaultMerchantRules.js'
 
 // merchantRules entries store `match` as either a plain substring (case-insensitive) or a
 // "/pattern/flags" string (stored as text since JSON can't hold a RegExp).
@@ -21,10 +22,11 @@ export function ruleMatches(rule, row) {
   return target.toLowerCase().includes(source.toLowerCase())
 }
 
-// Applies, in priority order: a matching user-defined merchant rule, then a built-in merchant
-// alias's default category, then leaves the row's own parser-assigned defaults untouched.
+// Applies, in priority order: a matching user-defined merchant rule, then a built-in default
+// rule, then a built-in merchant alias's default category, then leaves the row's own
+// parser-assigned defaults untouched.
 export function categorise(row, { merchantRules = [] } = {}) {
-  const userRule = merchantRules.find((rule) => ruleMatches(rule, row))
+  const userRule = [...merchantRules, ...DEFAULT_MERCHANT_RULES].find((rule) => ruleMatches(rule, row))
   if (userRule) {
     return {
       ...row,

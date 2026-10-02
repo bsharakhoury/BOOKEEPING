@@ -15,6 +15,7 @@ import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 import { mapLegacyBackup, mergeById, mergeVatAdjustments, parseLegacyBackup } from '../../lib/legacyImport.js'
 import { pushTransactionsToSheet, requestAccessToken } from '../../lib/googleSheetsSync.js'
 import { mergeMerchantRules, suggestMerchantRules } from '../../lib/merchantRuleSuggestions.js'
+import { DEFAULT_MERCHANT_RULES } from '../../data/defaultMerchantRules.js'
 
 const LEDGER_CHOICES = [
   { id: 'personal', label: 'Personal' },
@@ -547,7 +548,7 @@ export default function Settings() {
 
   function handleSuggestMerchantRules() {
     const transactions = getItem('transactions', [])
-    const suggestions = suggestMerchantRules(transactions, merchantRules)
+    const suggestions = suggestMerchantRules(transactions, [...merchantRules, ...DEFAULT_MERCHANT_RULES])
     setMerchantRuleSuggestions(suggestions)
     setCheckedSuggestions(new Set(suggestions.map((_, index) => index)))
   }
@@ -820,7 +821,8 @@ export default function Settings() {
         </div>
         <p className="settings-hint">
           Automatically sets a category on future imports (SMS or statement) when the merchant text matches. Also created
-          automatically when you tick "Remember merchant" during an import.
+          automatically when you tick "Remember merchant" during an import. {DEFAULT_MERCHANT_RULES.length} built-in rules
+          (fuel stations, supermarkets, taxis, common subscriptions…) always apply too; a rule you add here overrides them.
         </p>
         {merchantRules.length === 0 ? (
           <p className="settings-hint">No merchant rules yet.</p>

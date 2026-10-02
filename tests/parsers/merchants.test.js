@@ -18,4 +18,9 @@ describe('normaliseMerchant', () => {
     expect(normaliseMerchant('')).toBe('')
     expect(normaliseMerchant(null)).toBe('')
   })
+
+  it('maps both the SMS and the bank-statement spelling of Majid Al Futtaim to Carrefour', () => {
+    expect(normaliseMerchant('MAJID AL FUTTAIM HM, Dubai')).toBe('Carrefour')
+    expect(normaliseMerchant('MAJID ALFUTTAIM HM IMP AED DUBAI')).toBe('Carrefour')
+  })
 })
