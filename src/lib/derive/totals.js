@@ -47,13 +47,18 @@ export function totalsForRange(transactions, range) {
 // Running balance per account: opening balance plus every income/refund (credit) and expense
 // (debit) transaction recorded against it. Transfers are excluded — the model only records one
 // leg of a transfer, so treating it as a pure debit would understate total cash for a movement
-// that's still sitting in *some* tracked account, just not one we can identify here.
+// that's still sitting in *some* tracked account, just not one we can identify here. A transfer
+// that carries a `direction` ('in' | 'out' — set by the bank-statement importers, which know which
+// column the money appeared in) is counted, so an account that sends money elsewhere (RAK paying
+// the owner, an ATM withdrawal) shows the right balance; a transfer without one is still excluded.
 export function accountBalances(accounts, transactions) {
   return accounts.map((account) => {
     const delta = transactions.reduce((sum, txn) => {
       if (txn.paymentMethod !== account.name) return sum
       if (txn.type === 'income' || txn.type === 'refund') return sum + Number(txn.amount || 0)
       if (txn.type === 'expense') return sum - Number(txn.amount || 0)
+      if (txn.type === 'transfer' && txn.direction === 'in') return sum + Number(txn.amount || 0)
+      if (txn.type === 'transfer' && txn.direction === 'out') return sum - Number(txn.amount || 0)
       return sum
     }, 0)
     return { account, balance: round2((Number(account.openingBalance) || 0) + delta) }

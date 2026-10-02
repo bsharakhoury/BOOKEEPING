@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.17.0 — RAK Bank statement import, VAT-aware, with reconciliation
+
+Built from five real RAK files (three PDFs spanning May 2025 → Jun 2026, two monthly .txt exports): every file's running balance chains correctly row to row, so the 131 unique transactions are trustworthy.
+
+- `src/lib/parsers/rakTxt.js`: reads RAKBANK's fixed-width "Account Statement" .txt export (column positions taken from the header line). Rules, each tested: **bank charges** (maintenance 103.95, RAKvalue 51.45, the 1.05 + 3.15 pair after every outward transfer, Aani charge) → `LH – Bank Fees` with the 5% VAT inside the amount split out; **FTA payment** → `LH – VAT` (not a P&L expense); **transfers to the owner** and **ATM cash withdrawals** → transfers out (a movement of money, not a business cost); **Stripe payouts** → transfer in (the sessions are recorded separately, so counting the payout would double revenue); client payments → income on the income ledger (payer name kept so rules can categorise it); Aani in/out, card purchases and reversals, transfers within RAKBANK.
+- **VAT:** a bank charge dated on/after the registration date (`VAT_REGISTRATION_DATE = 2026-03-01`, user-confirmed) is flagged reclaimable with `docType: 'Tax Invoice'` — the bank e-statement is the evidence — so it actually reaches the VAT return. Before that date no VAT is claimed. This closes a real gap: `derive/vat.js` only counts input VAT on `docType === 'Tax Invoice'` rows, and nothing used to set it, so RAK fee VAT was silently excluded. On the user's real data it finds AED 3.50 of never-claimed input VAT (Mar–May 1.00, Jun–Aug 2.50), checked against the existing VAT records to rule out double counting.
+- **Bug fixed along the way:** `handleImportCommit` forced `docType: null` on every imported row, which would have discarded that flag on save.
+- **Transfer direction:** transfers may now carry `direction: 'in' | 'out'` (set by the RAK and Mashreq statement importers); `accountBalances` counts those and still ignores a transfer with no direction. Optional and additive — existing data needs no migration. Without it the app showed RAK holding AED 152,930.95 against a real balance of 8,121.92 (dividends recorded as income into RAK, owner draws/ATM/FTA payment missing).
+- `reconcileStatementRows` gains an **amount mode** for RAK (exact AED amounts, so rows pair by identical amount + direction within a day window, not by merchant wording; matching looks a few days past the period, but only entries inside it are flagged) alongside the existing merchant mode for Mashreq.
+- Review screen: each flagged entry now has **Keep / Remove / Move to account** (a dividend recorded against RAK belongs on Mashreq; Stripe sessions and fees belong on Stripe), and the import preview shows a **Claim VAT** tick per charge so VAT can be corrected before anything is saved.
+- `src/data/owner.js`: the owner's name pattern lives in one data file (used to tell owner draws from supplier payments), passed to the parser as an option so tests use a fake name.
+- Real statement files and the generated history file live in the git-ignored `RAK/` folder.
+
 ## 0.16.0 — Built-in merchant rules (no import step)
 
 - `src/data/defaultMerchantRules.js`: 98 starter rules built into the app, learned from the user's own categorisation history and their 8 Mashreq statements — fuel stations, supermarkets, taxis/RTA, Careem, common SaaS subscriptions. `categorise()` now consults the user's own `merchantRules` first, then these built-ins (longest match first), then the existing aliases — so a rule added in Settings always overrides a built-in, and every device gets them without importing anything.

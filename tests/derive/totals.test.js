@@ -68,3 +68,19 @@ describe('budgetProgress', () => {
     expect(result[0]).toMatchObject({ spent: 200, budget: 500, pct: 40 })
   })
 })
+
+describe('accountBalances — transfer direction', () => {
+  const accounts = [{ id: 'rak', name: 'RAK Bank', openingBalance: 100 }]
+
+  it('counts a transfer that carries a direction (money out of / into the account)', () => {
+    const transactions = [
+      { paymentMethod: 'RAK Bank', type: 'transfer', direction: 'out', amount: 30 },
+      { paymentMethod: 'RAK Bank', type: 'transfer', direction: 'in', amount: 5 }
+    ]
+    expect(accountBalances(accounts, transactions)[0].balance).toBe(75)
+  })
+
+  it('still ignores a transfer with no direction (only one leg is known)', () => {
+    expect(accountBalances(accounts, [{ paymentMethod: 'RAK Bank', type: 'transfer', amount: 30 }])[0].balance).toBe(100)
+  })
+})

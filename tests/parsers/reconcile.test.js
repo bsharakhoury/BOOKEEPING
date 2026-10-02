@@ -72,3 +72,53 @@ describe('reconcileStatementRows', () => {
     expect(result.additions).toHaveLength(1)
   })
 })
+
+describe('reconcileStatementRows — amount mode (RAK)', () => {
+  const options = { accounts: new Set(['RAK Bank']), matchBy: 'amount', dayWindow: 10 }
+  const bankRow = (overrides) => ({ date: '2026-04-09', rawMerchant: 'Transfer to owner', amount: 1000, type: 'transfer', direction: 'out', bankRef: null, notes: '', ...overrides })
+  const appTxn = (overrides) => ({ id: 'a1', date: '2026-04-09', amount: 1000, merchant: 'LH - Inward remittance Apr', paymentMethod: 'RAK Bank', type: 'income', ...overrides })
+
+  it('pairs rows by identical amount and direction, ignoring merchant wording, and corrects the date', () => {
+    const existing = appTxn({ type: 'expense', date: '2026-04-12', merchant: 'Owner draw' })
+    const result = reconcileStatementRows([bankRow()], [existing], options)
+    expect(result.updates).toHaveLength(1)
+    expect(result.updates[0].after.date).toBe('2026-04-09')
+    expect(result.additions).toHaveLength(0)
+    expect(result.flagged).toHaveLength(0)
+  })
+
+  it('does not pair an income entry with an outgoing bank row of the same amount (wrong direction)', () => {
+    const result = reconcileStatementRows([bankRow()], [appTxn()], options)
+    expect(result.additions).toHaveLength(1)
+    expect(result.flagged.map((t) => t.id)).toEqual(['a1'])
+  })
+
+  it('pairs a transfer that has no direction recorded with a bank row of either direction', () => {
+    const result = reconcileStatementRows([bankRow()], [appTxn({ type: 'transfer' })], options)
+    expect(result.additions).toHaveLength(0)
+  })
+
+  it('does not pair entries further apart than the day window', () => {
+    const result = reconcileStatementRows([bankRow()], [appTxn({ type: 'expense', date: '2026-04-25' })], options)
+    expect(result.additions).toHaveLength(1)
+  })
+
+  it('only considers the configured account', () => {
+    const result = reconcileStatementRows([bankRow()], [appTxn({ type: 'expense', paymentMethod: 'Mashreq Debit 9437' })], options)
+    expect(result.flagged).toHaveLength(0)
+    expect(result.additions).toHaveLength(1)
+  })
+
+  it('does not flag app entries dated outside the statement period', () => {
+    const outside = appTxn({ id: 'old', date: '2025-01-01', type: 'expense' })
+    const result = reconcileStatementRows([bankRow()], [outside], options)
+    expect(result.flagged).toHaveLength(0)
+  })
+
+  it('uses each existing entry at most once when two bank rows share an amount', () => {
+    const rows = [bankRow({ date: '2026-04-09' }), bankRow({ date: '2026-04-10' })]
+    const result = reconcileStatementRows(rows, [appTxn({ type: 'expense' })], options)
+    expect(result.matches).toHaveLength(1)
+    expect(result.additions).toHaveLength(1)
+  })
+})

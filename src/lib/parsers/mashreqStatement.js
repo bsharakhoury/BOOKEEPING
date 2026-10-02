@@ -145,6 +145,7 @@ export function parseMashreqStatementRows(rows) {
       fxRate: 1,
       fxAmount: amount,
       type: classified.type,
+      direction: classified.type === 'transfer' ? (isCredit ? 'in' : 'out') : null,
       paymentMethod: 'Mashreq Debit 9437',
       ledger: classified.ledger,
       category: classified.type === 'transfer' ? 'Transfer' : classified.category,

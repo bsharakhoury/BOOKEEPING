@@ -1,3 +1,7 @@
+// Leaf & Hook FZ LLC became VAT-registered on this date (first period: Mar – May 2026). Costs and
+// income before it carry no VAT.
+export const VAT_REGISTRATION_DATE = '2026-03-01'
+
 // UAE FTA quarterly VAT periods used for Leaf & Hook FZ LLC.
 export const VAT_PERIODS = [
   { id: 'mar-may', label: 'Mar – May', startMonth: 3, endMonth: 5, dueMonth: 6, dueDay: 29 },

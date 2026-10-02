@@ -1,0 +1,74 @@
+Account Statement
+________________________________________________________________________________________________________________________
+
+Statement Criteria
+________________________________________________________________________________________________________________________
+
+Name              TEST COMPANY FZ LLC
+Account Id        RAK STARTER ACCOUNT No.0000000000001
+Bank Id           RAK
+Branch Name       TEST BRANCH
+From Date         01/06/2026
+To Date           30/06/2026
+
+
+________________________________________________________________________________________________________________________
+
+Date            Description                        Cheque No        Withdrawal            Deposit         Balance
+________________________________________________________________________________________________________________________
+
+30/06/2026    ATM CASH WITHDRAWAL                                      5,000.00                           12,000.00
+              000001/000002 TestMall0001
+
+26/06/2026    INWARD T/T                                                                   1,500.00       17,000.00
+              /REF/AEL2606260000001 ntsub_AAAA
+              TEST PAYMENTS NETWORK INTERNATIONAL LLC
+
+25/06/2026    OUTWARD T/T                                                900.00                           15,500.00
+              1.00
+              Federal tax authority
+
+25/06/2026    COLLECTION COMM.                                            51.45                           16,400.00
+              RAKvalue Monthly Fee For JUN-2026-INCL.
+              VAT
+
+20/06/2026    INWARD T/T                                                                  10,000.00       16,451.45
+              /REF/ACM EXAMPLE EVENTS AND PRODUCTIONS LL
+
+18/06/2026    OUTWARD T/T                                              2,000.00                            6,451.45
+              1.00 Test Owner Name
+
+18/06/2026    CHARGE COLLECTION-INCL. VAT                                  1.05                            8,451.45
+              Charge Collection-INCL. VAT 1.00 Test Owner Name
+
+18/06/2026    CHARGE COLLECTION-INCL. VAT                                  3.15                            8,452.50
+              Charge Collection-INCL. VAT OUTWARD REMITTANCE CHARGE
+
+10/06/2026    AANI TO SAMPLE SUPPLIER SERVICES                           300.00                            8,455.65
+              191000001
+              1.0000
+
+08/06/2026    PURCHASE TRXN.                                             200.00                            8,755.65
+              Sample Shop Dubai ARE
+              546750XXXXXX0000
+              Value Date: 06/06/2026
+
+08/06/2026    PURCHASE TRXN.-REV                                                              50.00        8,955.65
+              Sample Shop Dubai ARE
+              546750XXXXXX0000
+              Value Date: 06/06/2026
+
+05/06/2026    AANI FROM SAMPLE CLIENT LLC                                                    700.00        8,905.65
+              T_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa M00001
+              1.0000 /REF/ PAYMENT
+
+01/06/2026    CHARGE COLLECTION-INCL. VAT                                103.95                            8,205.65
+              MAINT_TRAN_CHRG
+
+02/02/2026    CHARGE COLLECTION-INCL. VAT                                103.95                            8,309.60
+              MAINT_TRAN_CHRG
+
+________________________________________________________________________________________________________________________
+                                Total                                  9,000.00           12,250.00
+________________________________________________________________________________________________________________________
+

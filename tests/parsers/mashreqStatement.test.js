@@ -108,4 +108,11 @@ describe('parseMashreqStatementRows', () => {
     const [txn] = parseMashreqStatementRows(rows)
     expect(txn.category).toBe('Transfer')
   })
+
+  it('records which way an account transfer moved the money', () => {
+    const out = parseMashreqStatementRows([['05 Jul 2026', '05 Jul 2026', 'R', 'Acct to Acct transfer FUND TRANSFER - 1 - TEST', '', '-400.00', '1']])[0]
+    const into = parseMashreqStatementRows([['05 Jul 2026', '05 Jul 2026', 'R', 'Acct to Acct transfer FUND TRANSFER - 1 - TEST', '+400.00', '', '1']])[0]
+    expect(out).toMatchObject({ type: 'transfer', direction: 'out' })
+    expect(into).toMatchObject({ type: 'transfer', direction: 'in' })
+  })
 })

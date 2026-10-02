@@ -1,6 +1,7 @@
 import { parseMashreqSms } from './mashreqSms.js'
 import { parseRakStatement } from './rakStatement.js'
 import { parseRakCsv } from './rakCsv.js'
+import { looksLikeRakTxt, parseRakTxt } from './rakTxt.js'
 import { parseStripeCsv } from './stripeCsv.js'
 
 const MASHREQ_SMS_HINT_RE = /purchase with (debit card|neo visa)|has been debited|has been credited|salary of aed/i
@@ -11,6 +12,12 @@ const RAK_STATEMENT_HINT_RE = /^\d{1,2}\s+[a-z]{3,}\s+\d{4}/i
 export function detect({ text = '', fileName = '' } = {}) {
   const trimmedText = String(text).trim()
   const lowerName = String(fileName).toLowerCase()
+
+  // RAKBANK's fixed-width "Account Statement" text export — recognised by its own header block,
+  // whatever the file is called (and also when pasted straight from the file).
+  if (looksLikeRakTxt(trimmedText)) {
+    return { id: 'rakTxt', label: 'RAK Bank (statement .txt)', parse: parseRakTxt }
+  }
   const firstLine = (trimmedText.split(/\r?\n/)[0] || '').toLowerCase()
 
   if (lowerName.endsWith('.csv') || fileName) {

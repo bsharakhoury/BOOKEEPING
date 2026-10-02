@@ -106,6 +106,30 @@ export function ImportPreview({ rawRows, meta, categories, accounts, merchantRul
       label: 'Amount',
       render: (row) => <span className={`money money--${row.type}`}>{formatMoney(row.amount)}</span>
     },
+    ...(rows.some((row) => row.inputVat)
+      ? [
+          {
+            key: 'vat',
+            label: 'Claim VAT',
+            render: (row) =>
+              row.inputVat ? (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(row.reclaimable)}
+                    onChange={(event) =>
+                      updateRow(row._key, { reclaimable: event.target.checked, docType: event.target.checked ? 'Tax Invoice' : null })
+                    }
+                    aria-label="Claim this VAT on the return"
+                  />{' '}
+                  <span className="money">{formatMoney(row.inputVat)}</span>
+                </label>
+              ) : (
+                '—'
+              )
+          }
+        ]
+      : []),
     {
       key: 'remember',
       label: 'Remember merchant',

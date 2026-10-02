@@ -14,7 +14,7 @@ export function ImportBox({ onParsed, fxRates }) {
     const parser = detect({ text, fileName })
     if (!parser) {
       setError(
-        "Couldn't recognise this text or file. Supported: Mashreq SMS, Mashreq statement (.xlsx), RAK Bank (statement text or Account_Transactions_CSV), Stripe CSV."
+        "Couldn't recognise this text or file. Supported: Mashreq SMS, Mashreq statement (.xlsx), RAK Bank (statement .txt, statement text or Account_Transactions_CSV), Stripe CSV."
       )
       return
     }
@@ -88,12 +88,12 @@ export function ImportBox({ onParsed, fxRates }) {
         </button>
         <span className="import-box__or">or</span>
         <button type="button" onClick={() => fileInputRef.current?.click()}>
-          Upload CSV or Mashreq statement (.xlsx)
+          Upload statement (.txt, .csv or Mashreq .xlsx)
         </button>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".csv,text/csv,.txt,text/plain,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           hidden
           onChange={handleFileSelected}
         />
@@ -104,7 +104,7 @@ export function ImportBox({ onParsed, fxRates }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
-        or drag a CSV or Mashreq statement (.xlsx) file here
+        or drag a statement file here (RAK .txt, Mashreq .xlsx, CSV)
       </div>
       {error && <p className="import-box__error">{error}</p>}
     </div>

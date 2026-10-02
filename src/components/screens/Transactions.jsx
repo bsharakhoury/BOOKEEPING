@@ -19,7 +19,15 @@ import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 import { DEFAULT_FX_RATES } from '../../lib/fx.js'
 
-const CSV_PARSER_IDS = new Set(['rakCsv', 'stripeCsv', 'mashreqStatement'])
+const CSV_PARSER_IDS = new Set(['rakCsv', 'stripeCsv', 'mashreqStatement', 'rakTxt'])
+
+// Statement imports that are reconciled against what's already in the app before anything is added.
+// RAK amounts are exact AED, so rows are paired by amount + direction + date; Mashreq's drift
+// (foreign-currency conversion), so those are paired by merchant.
+const RECONCILE_OPTIONS = {
+  mashreqStatement: {},
+  rakTxt: { accounts: new Set(['RAK Bank']), matchBy: 'amount', dayWindow: 10 }
+}
 function sourceForParser(parserId) {
   return CSV_PARSER_IDS.has(parserId) ? 'csv' : 'sms'
 }
@@ -256,8 +264,8 @@ function ImportModal({ open, categories, accounts, transactions, merchantRules, 
   }
 
   function handleParsed(rawRows, meta) {
-    if (meta.parserId === 'mashreqStatement') {
-      const result = reconcileStatementRows(rawRows, transactions)
+    if (RECONCILE_OPTIONS[meta.parserId]) {
+      const result = reconcileStatementRows(rawRows, transactions, RECONCILE_OPTIONS[meta.parserId])
       if (result.updates.length > 0 || result.flagged.length > 0) {
         setReconcile({ result, meta })
         return
@@ -281,8 +289,8 @@ function ImportModal({ open, categories, accounts, transactions, merchantRules, 
           result={reconcile.result}
           meta={reconcile.meta}
           onCancel={() => setReconcile(null)}
-          onApply={(updates, deleteIds) => {
-            onReconcileApply(updates, deleteIds)
+          onApply={(updates, deleteIds, moves) => {
+            onReconcileApply(updates, deleteIds, moves)
             const additions = reconcile.result.additions
             const meta = reconcile.meta
             setReconcile(null)
@@ -411,6 +419,7 @@ export default function Transactions() {
       ledger: row.ledger,
       amount: row.amount,
       type: row.type,
+      direction: row.direction ?? null,
       paymentMethod: row.paymentMethod,
       currency: row.currency || 'AED',
       fxRate: row.fxRate ?? 1,
@@ -424,7 +433,7 @@ export default function Transactions() {
       linkedSubId: null,
       inputVat: row.inputVat ?? null,
       reclaimable: row.reclaimable ?? false,
-      docType: null,
+      docType: row.docType ?? null,
       installment: null,
       importBatchId: batchId,
       createdAt: now,
@@ -460,19 +469,24 @@ export default function Transactions() {
     })
   }
 
-  function handleReconcileApply(updates, deleteIds) {
+  function handleReconcileApply(updates, deleteIds, moves = []) {
     const snapshot = transactions
+    const now = new Date().toISOString()
     setTransactions((prev) => {
       const kept = prev.filter((txn) => !deleteIds.includes(txn.id))
       return kept.map((txn) => {
         const update = updates.find((u) => u.id === txn.id)
-        return update ? { ...txn, ...update.after, updatedAt: new Date().toISOString() } : txn
+        const move = moves.find((m) => m.id === txn.id)
+        let next = txn
+        if (update) next = { ...next, ...update.after, updatedAt: now }
+        if (move) next = { ...next, paymentMethod: move.paymentMethod, updatedAt: now }
+        return next
       })
     })
-    showToast(
-      `${updates.length} entr${updates.length === 1 ? 'y' : 'ies'} corrected, ${deleteIds.length} removed`,
-      { actionLabel: 'Undo', onAction: () => setTransactions(snapshot) }
-    )
+    const bits = [`${updates.length} corrected`]
+    if (moves.length > 0) bits.push(`${moves.length} moved`)
+    if (deleteIds.length > 0) bits.push(`${deleteIds.length} removed`)
+    showToast(bits.join(', '), { actionLabel: 'Undo', onAction: () => setTransactions(snapshot) })
   }
 
   const columns = [
