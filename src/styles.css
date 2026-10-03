@@ -1096,3 +1096,7 @@ button.primary,
   align-items: baseline;
   gap: 8px;
 }
+
+.settings-hint--warn {
+  color: var(--color-terracotta);
+}

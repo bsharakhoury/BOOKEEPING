@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.0 — Google sign-in window no longer pops up on every edit
+
+- **Cause:** after each add/edit the background backup asked Google for a fresh sign-in token. In a browser-only app that request is never truly silent, so Google's account window opened every time.
+- **Fix:** the app now keeps the token Google gives you (in memory only, about an hour) and reuses it for every automatic backup. Automatic backup **never asks Google for anything**; a Google window can only open when you click *Connect* or *Sync now* in Settings.
+- When the sign-in has lapsed (new session, or after ~1 hour), edits are saved as normal and the backup simply pauses. You see one toast per session ("Google Sheets backup paused — sign-in expired", with an Open Settings button), and Settings shows the same notice. Click *Sync now* once to resume.
+- A lapsed sign-in no longer flips the connection to "disconnected"; your Sheet ID and settings stay put.
+- Tests: `tests/autoSync.test.js` (disabled, synced, paused with no token, 401 pause, network failure) plus token-cache tests. Verified live: with Sheets connected and no token, an edit loads no Google script and shows one toast.
+
 ## 0.18.0 — Import several statement files at once; app updates no longer lag a reload
 
 - The import box now accepts **multiple files** at once (choose or drag several): a RAK history file plus the monthly ones go in as a single import and a single review. `src/lib/parsers/multiFile.js` merges them newest-first and drops a row only when it repeats an overlapping file's row on date, amount, type, text *and* the bank's running balance (or its own reference), so two genuinely identical charges on one day (different balances) are both kept. Mixing different kinds of statement (RAK with Mashreq) is refused with a clear message, since they reconcile against different accounts. Errors name the offending file.

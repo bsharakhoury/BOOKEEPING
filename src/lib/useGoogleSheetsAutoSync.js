@@ -1,8 +1,51 @@
 import { useEffect, useRef } from 'react'
 import { getItem, setItem } from './storage.js'
-import { pushTransactionsToSheet, requestAccessToken } from './googleSheetsSync.js'
+import { forgetAccessToken, getCachedAccessToken, pushTransactionsToSheet } from './googleSheetsSync.js'
 
 const DEBOUNCE_MS = 5000
+
+function updateGoogleSheetsSettings(patch) {
+  const latest = getItem('settings', {})
+  setItem('settings', { ...latest, googleSheets: { ...latest.googleSheets, ...patch } })
+}
+
+// One background sync attempt. It NEVER asks Google for anything: it uses the access token the app
+// is already holding from the last time the user clicked Connect / Sync now (valid ~1 hour). With
+// no valid token it does nothing but record that the backup is paused — opening a sign-in window
+// on every edit was the bug this replaced. Returns what happened, for the caller and for tests.
+export async function runAutoSync({
+  getSettings = () => getItem('settings', {}),
+  getTransactions = () => getItem('transactions', []),
+  getToken = getCachedAccessToken,
+  push = pushTransactionsToSheet,
+  save = updateGoogleSheetsSettings,
+  dropToken = forgetAccessToken,
+  now = () => new Date().toISOString()
+} = {}) {
+  const gs = getSettings().googleSheets
+  if (!gs?.connected || !gs.clientId || !gs.sheetId) return 'disabled'
+
+  const token = getToken()
+  if (!token) {
+    save({ needsReconnect: true })
+    return 'paused'
+  }
+
+  try {
+    await push({ accessToken: token, sheetId: gs.sheetId, transactions: getTransactions() })
+    save({ lastSyncedAt: now(), needsReconnect: false })
+    return 'synced'
+  } catch (error) {
+    // Only an authorisation failure means the sign-in is no longer good; anything else (offline, a
+    // hiccup) just leaves the next edit to try again.
+    if (error?.status === 401 || error?.status === 403) {
+      dropToken()
+      save({ needsReconnect: true })
+      return 'paused'
+    }
+    return 'failed'
+  }
+}
 
 // Listens for any write to the 'transactions' key (from whichever screen made it — Transactions,
 // import, legacy import, Duplicates, etc. all funnel through storage.js) and, if Google Sheets
@@ -13,22 +56,10 @@ export function useGoogleSheetsAutoSync() {
 
   useEffect(() => {
     function scheduleSync() {
-      const settings = getItem('settings', {})
-      const gs = settings.googleSheets
-      if (!gs?.connected || !gs.clientId || !gs.sheetId) return
-
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(async () => {
-        try {
-          const token = await requestAccessToken(gs.clientId, { silent: true })
-          const transactions = getItem('transactions', [])
-          await pushTransactionsToSheet({ accessToken: token, sheetId: gs.sheetId, transactions })
-          const latest = getItem('settings', {})
-          setItem('settings', { ...latest, googleSheets: { ...latest.googleSheets, lastSyncedAt: new Date().toISOString() } })
-        } catch {
-          const latest = getItem('settings', {})
-          setItem('settings', { ...latest, googleSheets: { ...latest.googleSheets, connected: false } })
-        }
+        const outcome = await runAutoSync()
+        if (outcome === 'paused') window.dispatchEvent(new CustomEvent('mf:sync-paused'))
       }, DEBOUNCE_MS)
     }
 

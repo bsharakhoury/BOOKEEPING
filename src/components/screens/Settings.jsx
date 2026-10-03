@@ -13,7 +13,7 @@ import { useToast } from '../ui/Toast.jsx'
 import { DEFAULT_CATEGORIES } from '../../data/categories.js'
 import { DEFAULT_ACCOUNTS } from '../../data/accounts.js'
 import { mapLegacyBackup, mergeById, mergeVatAdjustments, parseLegacyBackup } from '../../lib/legacyImport.js'
-import { pushTransactionsToSheet, requestAccessToken } from '../../lib/googleSheetsSync.js'
+import { forgetAccessToken, getCachedAccessToken, pushTransactionsToSheet, requestAccessToken } from '../../lib/googleSheetsSync.js'
 import { mergeMerchantRules, suggestMerchantRules } from '../../lib/merchantRuleSuggestions.js'
 import { DEFAULT_MERCHANT_RULES } from '../../data/defaultMerchantRules.js'
 
@@ -400,10 +400,10 @@ export default function Settings() {
     setGsBusy(true)
     setGsStatus('Requesting Google permission…')
     try {
-      const token = await requestAccessToken(clientId, { silent: false })
+      const token = await requestAccessToken(clientId, { consent: true })
       const transactions = getItem('transactions', [])
       const result = await pushTransactionsToSheet({ accessToken: token, sheetId, transactions })
-      updateGoogleSheets({ connected: true, lastSyncedAt: new Date().toISOString() })
+      updateGoogleSheets({ connected: true, needsReconnect: false, lastSyncedAt: new Date().toISOString() })
       setGsStatus(`Connected — synced ${result.rowCount} transaction${result.rowCount === 1 ? '' : 's'}.`)
     } catch (error) {
       setGsStatus(error.message || 'Could not connect to Google Sheets.')
@@ -412,20 +412,22 @@ export default function Settings() {
     }
   }
 
+  // A click here is the one moment a Google window may open (when the saved sign-in has lapsed);
+  // edits elsewhere in the app never trigger it.
   async function handleSyncNow() {
     const { clientId, sheetId } = settings.googleSheets || {}
     if (!clientId || !sheetId) return
     setGsBusy(true)
     setGsStatus('Syncing…')
     try {
-      const token = await requestAccessToken(clientId, { silent: true })
+      const token = getCachedAccessToken() || (await requestAccessToken(clientId))
       const transactions = getItem('transactions', [])
       const result = await pushTransactionsToSheet({ accessToken: token, sheetId, transactions })
-      updateGoogleSheets({ lastSyncedAt: new Date().toISOString() })
+      updateGoogleSheets({ lastSyncedAt: new Date().toISOString(), needsReconnect: false })
       setGsStatus(`Synced ${result.rowCount} transaction${result.rowCount === 1 ? '' : 's'}.`)
-    } catch {
-      updateGoogleSheets({ connected: false })
-      setGsStatus('Session expired — click Connect to reconnect.')
+    } catch (error) {
+      if (error?.status === 401 || error?.status === 403) forgetAccessToken()
+      setGsStatus(error?.message || 'Could not sync — try again.')
     } finally {
       setGsBusy(false)
     }
@@ -1034,10 +1036,16 @@ export default function Settings() {
             </>
           )}
         </div>
+        {settings.googleSheets?.connected && settings.googleSheets?.needsReconnect && (
+          <p className="settings-hint settings-hint--warn">
+            Backup paused: your Google sign-in has lapsed (it lasts about an hour). Your changes are safe in this app, but not in the
+            sheet yet — click <strong>Sync now</strong> to sign in and catch up.
+          </p>
+        )}
         {gsStatus && <p className="settings-hint">{gsStatus}</p>}
         {settings.googleSheets?.connected && settings.googleSheets?.lastSyncedAt && (
           <p className="settings-hint">
-            Connected · last synced {formatDate(settings.googleSheets.lastSyncedAt)} · auto-syncs a few seconds after any change.
+            Connected · last synced {formatDate(settings.googleSheets.lastSyncedAt)} · backs up a few seconds after any change while your Google sign-in is active.
           </p>
         )}
       </section>

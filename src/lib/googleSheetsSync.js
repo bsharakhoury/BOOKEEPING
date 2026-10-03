@@ -26,22 +26,46 @@ function loadGis() {
   return gisLoadPromise
 }
 
-// Requests an OAuth access token for the Sheets scope. `silent: true` asks Google not to show
-// a consent popup — it resolves only if the user already granted access in this browser
-// (used for auto-sync on load); otherwise it rejects so the caller can prompt for reconnect.
-export async function requestAccessToken(clientId, { silent = false } = {}) {
+// The access token lasts about an hour. It is kept in memory only (never stored), so the app can
+// keep syncing edits for that hour without asking Google again — and so that automatic syncing
+// never has a reason to open a sign-in window.
+let cachedToken = null
+
+export function rememberAccessToken(response, now = Date.now()) {
+  const lifetimeMs = (Number(response.expires_in) || 3600) * 1000
+  cachedToken = { value: response.access_token, expiresAt: now + lifetimeMs }
+}
+
+export function getCachedAccessToken(now = Date.now()) {
+  // A minute of margin so a token isn't used a moment before it expires mid-request.
+  return cachedToken && cachedToken.expiresAt - now > 60_000 ? cachedToken.value : null
+}
+
+export function forgetAccessToken() {
+  cachedToken = null
+}
+
+// Asks Google for an access token. This ALWAYS may open a Google sign-in / account-chooser window
+// (the browser-only flow has no truly silent refresh), so it must only ever be called from a
+// direct user click — never from background syncing. `consent: true` forces the full permission
+// screen (first connect); otherwise Google only asks if it has to.
+export async function requestAccessToken(clientId, { consent = false } = {}) {
   await loadGis()
   return new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: SCOPE,
       callback: (response) => {
-        if (response.error) reject(new Error(response.error))
-        else resolve(response.access_token)
+        if (response.error) {
+          reject(new Error(response.error))
+          return
+        }
+        rememberAccessToken(response)
+        resolve(response.access_token)
       },
       error_callback: (error) => reject(new Error(error?.type || 'Google sign-in failed.'))
     })
-    client.requestAccessToken({ prompt: silent ? '' : 'consent' })
+    client.requestAccessToken({ prompt: consent ? 'consent' : '' })
   })
 }
 
@@ -74,7 +98,7 @@ export async function pushTransactionsToSheet({ accessToken, sheetId, transactio
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}` }
   })
-  if (!clearRes.ok) throw new Error(`Could not clear the sheet (HTTP ${clearRes.status}).`)
+  if (!clearRes.ok) throw Object.assign(new Error(`Could not clear the sheet (HTTP ${clearRes.status}).`), { status: clearRes.status })
 
   const range = `${SHEET_TAB}!A1`
   const updateRes = await fetchImpl(`${SHEETS_API}/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
@@ -82,7 +106,7 @@ export async function pushTransactionsToSheet({ accessToken, sheetId, transactio
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ values: rows })
   })
-  if (!updateRes.ok) throw new Error(`Could not write to the sheet (HTTP ${updateRes.status}).`)
+  if (!updateRes.ok) throw Object.assign(new Error(`Could not write to the sheet (HTTP ${updateRes.status}).`), { status: updateRes.status })
 
   return { rowCount: rows.length - 1 }
 }

@@ -7,6 +7,7 @@ import { loadSeedOnFirstRun } from './lib/seed.js'
 import { RemountContext } from './lib/remountContext.js'
 import { NavigationContext } from './lib/navigationContext.js'
 import { useGoogleSheetsAutoSync } from './lib/useGoogleSheetsAutoSync.js'
+import { useToast } from './components/ui/Toast.jsx'
 import { applyTheme } from './theme.js'
 
 import Dashboard from './components/screens/Dashboard.jsx'
@@ -44,6 +45,23 @@ const SECONDARY_ITEMS = [
 ]
 
 const SIDEBAR_ITEMS = [...PRIMARY_TABS, ...SECONDARY_ITEMS, ...MORE_ITEMS]
+
+// Tells the user — once per session, without opening anything — that the Google Sheets backup has
+// paused because its sign-in lapsed. Lives inside the ToastProvider so it can raise a toast.
+function SyncPausedNotice({ onOpenSettings }) {
+  const showToast = useToast()
+  useEffect(() => {
+    let told = false
+    function handlePaused() {
+      if (told) return
+      told = true
+      showToast('Google Sheets backup paused — sign-in expired.', { actionLabel: 'Open Settings', onAction: onOpenSettings, duration: 10000 })
+    }
+    window.addEventListener('mf:sync-paused', handlePaused)
+    return () => window.removeEventListener('mf:sync-paused', handlePaused)
+  }, [showToast, onOpenSettings])
+  return null
+}
 
 function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
   const [moreOpen, setMoreOpen] = useState(false)
@@ -114,6 +132,7 @@ function App({ screenId, onSelectScreen, onRequestRemount = () => {} }) {
         <RemountContext.Provider value={onRequestRemount}>
         <NavigationContext.Provider value={selectScreen}>
           <div className="app-shell">
+            <SyncPausedNotice onOpenSettings={() => selectScreen('settings')} />
             <nav className="sidebar" aria-label="Primary">
               {SIDEBAR_ITEMS.map((item) => (
                 <button
